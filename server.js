@@ -1,5 +1,6 @@
 // server.js
 
+
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
@@ -15,13 +16,8 @@ const stockRoutes = require('./routes/stockRoute');
 const transactionRoutes = require('./routes/transactionRoutes');
 const { initializeDatabases } = require('./config/database');
 
-
-
 const app = express();
 const PORT = process.env.PORT || 3000;
-
-
-
 
 // Middleware
 app.use(cors({
@@ -29,7 +25,6 @@ app.use(cors({
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
-
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -113,38 +108,6 @@ const initializeDatabase = async () => {
         console.log('✅ Role column added with constraints');
       }
 
-
-
-
-
-
-      // First, check if users table exists
-      const usersTableExists = await client.query(`
-      SELECT EXISTS (
-        SELECT FROM information_schema.tables 
-        WHERE table_schema = 'public' 
-        AND table_name = 'users'
-      )
-    `);
-
-      if (!usersTableExists.rows[0].exists) {
-        // Create users table
-        console.log('📁 Creating users table...');
-        await client.query(`
-        CREATE TABLE users (
-          id SERIAL PRIMARY KEY,
-          name VARCHAR(100) NOT NULL,
-          email VARCHAR(100) UNIQUE NOT NULL,
-          password TEXT NOT NULL,
-          role VARCHAR(20) DEFAULT 'user',
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          CONSTRAINT valid_role CHECK (role IN ('user', 'admin', 'manager', 'staff'))
-        )
-      `);
-        console.log('✅ Users table created');
-      }
-
       // Check if branches table exists
       const branchesTableExists = await client.query(`
       SELECT EXISTS (
@@ -195,7 +158,6 @@ const initializeDatabase = async () => {
       `);
         console.log('✅ Branches table created');
 
-
         // Create indexes
         await client.query(`
         CREATE INDEX idx_branches_status ON branches(status);
@@ -206,8 +168,6 @@ const initializeDatabase = async () => {
         console.log('✅ Indexes created');
       }
 
-
-
       // Check if departments table exists
       const departmentsExists = await client.query(`
   SELECT EXISTS (
@@ -217,15 +177,13 @@ const initializeDatabase = async () => {
   )
 `);
 
-
-
       if (!departmentsExists.rows[0].exists) {
         console.log('📁 Creating departments table...');
         await client.query(`
     CREATE TABLE departments (
       id SERIAL PRIMARY KEY,
       branch_id INTEGER NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
-      type VARCHAR(100) NOT NULL,  -- Changed: No foreign key, just string
+      type VARCHAR(100) NOT NULL,
       name VARCHAR(255) NOT NULL,
       head_id VARCHAR(100) NOT NULL,
       staff_count INTEGER DEFAULT 0,
@@ -244,11 +202,10 @@ const initializeDatabase = async () => {
   `);
         console.log('✅ Departments table created');
 
-
         // Create indexes for departments table
         await client.query(`
     CREATE INDEX idx_departments_branch_id ON departments(branch_id);
-    CREATE INDEX idx_departments_type ON departments(type);  -- Still useful for filtering
+    CREATE INDEX idx_departments_type ON departments(type);
     CREATE INDEX idx_departments_head_id ON departments(head_id);
     CREATE INDEX idx_departments_is_active ON departments(is_active);
   `);
@@ -319,8 +276,6 @@ const initializeDatabase = async () => {
       FOR EACH ROW
       EXECUTE FUNCTION update_updated_at_column();
     `);
-
-
     }
 
     const checkTableQuery = `
@@ -330,7 +285,6 @@ const initializeDatabase = async () => {
                 AND table_name = 'suppliers'
             );
         `;
-
 
     const result = await pool.query(checkTableQuery);
     const tableExistss = result.rows[0].exists;
@@ -348,13 +302,9 @@ const initializeDatabase = async () => {
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
 
-                -- Create an index on name for faster searches
                 CREATE INDEX IF NOT EXISTS idx_suppliers_name ON suppliers(name);
-                
-                -- Create an index on created_at for faster sorting
                 CREATE INDEX IF NOT EXISTS idx_suppliers_created_at ON suppliers(created_at DESC);
                 
-                -- Optional: Create a function to update updated_at timestamp
                 CREATE OR REPLACE FUNCTION update_updated_at_column()
                 RETURNS TRIGGER AS $$
                 BEGIN
@@ -363,7 +313,6 @@ const initializeDatabase = async () => {
                 END;
                 $$ language 'plpgsql';
 
-                -- Create trigger to automatically update updated_at
                 DROP TRIGGER IF EXISTS update_suppliers_updated_at ON suppliers;
                 CREATE TRIGGER update_suppliers_updated_at
                     BEFORE UPDATE ON suppliers
@@ -373,25 +322,13 @@ const initializeDatabase = async () => {
 
       await pool.query(createTableQuery);
       console.log('✅ Suppliers table created successfully!');
-
-
-
       console.log("🔍 Checking if stocks table exists...");
-
-
-     
-
-
-
     }
 
+    // ALWAYS CHECK / CREATE STOCKS TABLE
+    console.log("🔍 Checking if stocks table exists...");
 
-    //-------------------------------------
-// ALWAYS CHECK / CREATE STOCKS TABLE
-//-------------------------------------
-console.log("🔍 Checking if stocks table exists...");
-
-const stocksTableExists = await pool.query(`
+    const stocksTableExists = await pool.query(`
   SELECT EXISTS (
     SELECT FROM information_schema.tables
     WHERE table_schema = 'public'
@@ -399,10 +336,10 @@ const stocksTableExists = await pool.query(`
   );
 `);
 
-if (!stocksTableExists.rows[0].exists) {
-  console.log("📁 Creating stocks table...");
+    if (!stocksTableExists.rows[0].exists) {
+      console.log("📁 Creating stocks table...");
 
-  await pool.query(`
+      await pool.query(`
     CREATE TABLE stocks (
       id SERIAL PRIMARY KEY,
       name VARCHAR(255) NOT NULL,
@@ -427,7 +364,7 @@ if (!stocksTableExists.rows[0].exists) {
     );
   `);
 
-  await pool.query(`
+      await pool.query(`
     CREATE OR REPLACE FUNCTION update_stock_updated_at()
     RETURNS TRIGGER AS $$
     BEGIN
@@ -435,7 +372,6 @@ if (!stocksTableExists.rows[0].exists) {
         RETURN NEW;
     END;
     $$ LANGUAGE plpgsql;
-
   
     DROP TRIGGER IF EXISTS update_stocks_updated_at ON stocks;
     CREATE TRIGGER update_stocks_updated_at
@@ -444,11 +380,10 @@ if (!stocksTableExists.rows[0].exists) {
     EXECUTE FUNCTION update_stock_updated_at();
   `);
 
-  console.log("✅ Stocks table created!");
-} else {
-  console.log("✔ Stocks table already exists");
-}
-
+      console.log("✅ Stocks table created!");
+    } else {
+      console.log("✔ Stocks table already exists");
+    }
 
     console.log('🎉 Database initialization complete!');
 
@@ -458,49 +393,32 @@ if (!stocksTableExists.rows[0].exists) {
   } finally {
     client.release();
   }
-
-
 };
-
 
 // Initialize database before starting server
 const startServer = async () => {
   try {
     // Initialize database first
-    // await initializeDatabases();
- console.log('🔄 Initializing database...');
+    await initializeDatabase();
+    console.log('🔄 Initializing database...');
     
     const dbResult = await initializeDatabases();
     
     if (dbResult.success) {
-      dbInitialized = true;
       console.log('✅ Database initialized successfully');
     } else {
       console.warn('⚠️ Database initialization had issues, but continuing...');
     }
-    // Routes
-
-    // Add this line
-
-    // ... existing code ...
 
     // Routes
     app.use('/api/auth', authRoutes);
     app.use('/api/branches', branchRoutes);
     app.use('/api/departments', departmentRoutes);
-
     app.use('/api/brands', brandRoutes);
     app.use('/api/categories', categoryRoutes);
-
     app.use('/api/suppliers', supplierRoutes);
     app.use('/api/stocks', stockRoutes);
-
     app.use('/api/transactions', transactionRoutes);
-
-
-
-
-    // ... rest of server.js ...
 
     // Health check endpoint
     app.get('/health', async (req, res) => {
@@ -543,13 +461,6 @@ const startServer = async () => {
 
     // Error handling middleware
     app.use((err, req, res, next) => {
-      console.error(err.stack);
-      res.status(500).json({ error: 'Something went wrong!' });
-    });
-
-
-    // Error handling middleware
-    app.use((err, req, res, next) => {
       console.error('Server error:', err);
 
       // Multer file size error
@@ -578,15 +489,4 @@ const startServer = async () => {
   }
 };
 
-
 startServer();
-
-
-
-
-
-
-
-
-
-

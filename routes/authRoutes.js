@@ -17,9 +17,9 @@ const {
 // Register User (Only 'user' role allowed for self-registration)
 router.post('/register', async (req, res) => {
   try {
-    const { name, email, password, role = 'user' } = req.body;
+    const { name, email, password, role } = req.body;
 
-    console.log("name"+name);
+    console.log("name"+name,role);
     // Validate input
     if (!name || !email || !password) {
       return res.status(400).json({ error: 'Name, email, and password are required' });
@@ -37,7 +37,7 @@ router.post('/register', async (req, res) => {
     }
 
     // Role validation - users can only register as 'user' by default
-    const validRoles = ['user'];
+  const validRoles = ['user', 'admin', 'manager', 'staff'];
     if (!validRoles.includes(role)) {
       return res.status(400).json({ error: 'New users can only register with "user" role' });
     }
