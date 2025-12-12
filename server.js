@@ -29,7 +29,7 @@ app.use(cors({
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
-app.use(cors());
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -579,21 +579,9 @@ const startServer = async () => {
 };
 
 
-
-
-
 startServer();
 
 
-
-
-// Handle graceful shutdown
-process.on('SIGINT', async () => {
-  console.log('\n🛑 Shutting down server...');
-  await pool.end();
-  console.log('✅ Database connections closed');
-  process.exit(0);
-});
 
 
 
