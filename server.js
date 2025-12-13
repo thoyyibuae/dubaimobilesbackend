@@ -83,7 +83,7 @@ const initializeDatabase = async () => {
       console.log('✅ Users table created');
     } else {
 
-      
+
       // Check if role column exists
       console.log('📊 Checking table structure...');
       const columns = await pool.query(`
@@ -427,6 +427,7 @@ const startServer = async () => {
     app.use('/api/stocks', stockRoutes);
     app.use('/api/transactions', transactionRoutes);
 
+
     // Health check endpoint
     app.get('/api/health', async (req, res) => {
       try {
@@ -447,40 +448,40 @@ const startServer = async () => {
     });
 
     // API Documentation
-    app.get('/api/docs', (req, res) => {
-      res.json({
-        message: 'Dubai Mobiles Backend API',
-        version: '1.0.0',
-        endpoints: {
-          auth: {
-            register: 'POST /api/auth/register',
-            login: 'POST /api/auth/login',
-            profile: 'GET /api/auth/profile',
-            users: 'GET /api/auth/users (admin only)',
-            updateRole: 'PATCH /api/auth/users/:id/role (admin only)',
-            deleteUser: 'DELETE /api/auth/users/:id (admin only)',
-            adminDashboard: 'GET /api/auth/admin-dashboard (admin/manager)'
-          },
-          health: 'GET /api/health',
-          docs: 'GET /api/docs'
-        },
-        note: 'For admin routes, include Authorization header: Bearer <token>'
-      });
-    });
+    // app.get('/api/docs', (req, res) => {
+    //   res.json({
+    //     message: 'Dubai Mobiles Backend API',
+    //     version: '1.0.0',
+    //     endpoints: {
+    //       auth: {
+    //         register: 'POST /api/auth/register',
+    //         login: 'POST /api/auth/login',
+    //         profile: 'GET /api/auth/profile',
+    //         users: 'GET /api/auth/users (admin only)',
+    //         updateRole: 'PATCH /api/auth/users/:id/role (admin only)',
+    //         deleteUser: 'DELETE /api/auth/users/:id (admin only)',
+    //         adminDashboard: 'GET /api/auth/admin-dashboard (admin/manager)'
+    //       },
+    //       health: 'GET /api/health',
+    //       docs: 'GET /api/docs'
+    //     },
+    //     note: 'For admin routes, include Authorization header: Bearer <token>'
+    //   });
+    // });
 
     // Root endpoint
-    app.get('/', (req, res) => {
-      res.json({
-        message: 'Dubai Mobiles Backend API',
-        status: 'running',
-        version: '1.0.0',
-        endpoints: {
-          health: '/api/health',
-          docs: '/api/docs',
-          auth: '/api/auth'
-        }
-      });
-    });
+    // app.get('/', (req, res) => {
+    //   res.json({
+    //     message: 'Dubai Mobiles Backend API',
+    //     status: 'running',
+    //     version: '1.0.0',
+    //     endpoints: {
+    //       health: '/api/health',
+    //       docs: '/api/docs',
+    //       auth: '/api/auth'
+    //     }
+    //   });
+    // });
 
     // Error handling middleware
     app.use((err, req, res, next) => {
@@ -498,6 +499,7 @@ const startServer = async () => {
 
       res.status(500).json({ error: 'Internal server error' });
     });
+
 
     const PORT = process.env.PORT || 3000;
     app.listen(PORT, () => {
