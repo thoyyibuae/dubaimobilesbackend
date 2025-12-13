@@ -82,6 +82,8 @@ const initializeDatabase = async () => {
       `);
       console.log('✅ Users table created');
     } else {
+
+      
       // Check if role column exists
       console.log('📊 Checking table structure...');
       const columns = await pool.query(`
