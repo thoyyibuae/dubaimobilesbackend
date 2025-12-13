@@ -84,7 +84,6 @@ router.post('/register', async (req, res) => {
   }
 });
 
-
 // Login User (All roles)
 router.post('/login', async (req, res) => {
   try {

@@ -1,4 +1,5 @@
-// server.js - CORRECTED IMPORTS
+// server.js
+
 
 const express = require('express');
 const cors = require('cors');
@@ -13,12 +14,7 @@ const categoryRoutes = require('./routes/categoryRoutes');
 const supplierRoutes = require('./routes/supplierRoutes');
 const stockRoutes = require('./routes/stockRoute');
 const transactionRoutes = require('./routes/transactionRoutes');
-
-// FIX: Import database correctly - pool is the default export
-const pool = require('./config/database');
-
-// FIX: Get initializeDatabases from pool object (it's attached to pool)
-const initializeDatabases = pool.initializeDatabases;
+const { initializeDatabases } = require('./config/database');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -35,59 +31,6 @@ app.use(express.urlencoded({ extended: true }));
 // Serve static files from uploads directory
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
-// ============ GLOBAL HEALTH CHECK ============
-// These routes should be accessible even if database is down
-
-app.get('/api/health', async (req, res) => {
-  try {
-    // Try to query database
-    await pool.query('SELECT 1');
-    res.json({
-      status: 'healthy',
-      database: 'connected',
-      timestamp: new Date().toISOString(),
-      uptime: process.uptime(),
-      environment: process.env.NODE_ENV || 'development',
-      server: 'Development'
-    });
-  } catch (error) {
-    // Database is down but server is running
-    res.status(200).json({
-      status: 'degraded',
-      database: 'disconnected',
-      timestamp: new Date().toISOString(),
-      uptime: process.uptime(),
-      environment: process.env.NODE_ENV || 'development',
-      message: 'Server running without database connection',
-      error: error.message
-    });
-  }
-});
-
-// Root endpoint
-app.get('/', (req, res) => {
-  res.json({
-    message: 'Dubai Mobiles Backend API',
-    status: 'running',
-    version: '1.0.0',
-    endpoints: {
-      health: 'GET /api/health',
-      auth: '/api/auth'
-    }
-  });
-});
-
-// Simple test endpoint
-app.get('/api/test', (req, res) => {
-  res.json({
-    test: 'OK',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime()
-  });
-});
-
-// =============================================
-
 // Debug environment variables
 console.log('Environment Variables:');
 console.log('DB_USER:', process.env.DB_USER);
@@ -102,15 +45,18 @@ if (!process.env.JWT_SECRET) {
   process.exit(1);
 }
 
+// Import database config
+const pool = require('./config/database');
+
 // Database initialization function
 const initializeDatabase = async () => {
-  // FIX: Use pool.query instead of pool.connect() for simple operations
-  // OR if you need a client, use pool.connect() properly
+  const client = await pool.connect();
+
   try {
     console.log('🔄 Initializing database schema...');
 
     // First, check if users table exists
-    const tableExists = await pool.query(`
+    const tableExists = await client.query(`
       SELECT EXISTS (
         SELECT FROM information_schema.tables 
         WHERE table_schema = 'public' 
@@ -121,7 +67,7 @@ const initializeDatabase = async () => {
     if (!tableExists.rows[0].exists) {
       // Create users table with all columns
       console.log('📁 Creating users table...');
-      await pool.query(`
+      await client.query(`
         CREATE TABLE users (
           id SERIAL PRIMARY KEY,
           name VARCHAR(100) NOT NULL,
@@ -137,7 +83,7 @@ const initializeDatabase = async () => {
     } else {
       // Check if role column exists
       console.log('📊 Checking table structure...');
-      const columns = await pool.query(`
+      const columns = await client.query(`
         SELECT column_name 
         FROM information_schema.columns 
         WHERE table_name = 'users' 
@@ -149,13 +95,13 @@ const initializeDatabase = async () => {
       // Add role column if it doesn't exist
       if (!columnNames.includes('role')) {
         console.log('➕ Adding role column to users table...');
-        await pool.query(`
+        await client.query(`
           ALTER TABLE users 
           ADD COLUMN role VARCHAR(20) DEFAULT 'user'
         `);
 
         // Add constraint separately
-        await pool.query(`
+        await client.query(`
           ALTER TABLE users 
           ADD CONSTRAINT valid_role CHECK (role IN ('user', 'admin', 'manager', 'staff'))
         `);
@@ -163,7 +109,7 @@ const initializeDatabase = async () => {
       }
 
       // Check if branches table exists
-      const branchesTableExists = await pool.query(`
+      const branchesTableExists = await client.query(`
       SELECT EXISTS (
         SELECT FROM information_schema.tables 
         WHERE table_schema = 'public' 
@@ -174,7 +120,7 @@ const initializeDatabase = async () => {
       if (!branchesTableExists.rows[0].exists) {
         // Create branches table
         console.log('📁 Creating branches table...');
-        await pool.query(`
+        await client.query(`
         CREATE TABLE branches (
           id SERIAL PRIMARY KEY,
           name VARCHAR(255) NOT NULL,
@@ -213,7 +159,7 @@ const initializeDatabase = async () => {
         console.log('✅ Branches table created');
 
         // Create indexes
-        await pool.query(`
+        await client.query(`
         CREATE INDEX idx_branches_status ON branches(status);
         CREATE INDEX idx_branches_country ON branches(country);
         CREATE INDEX idx_branches_city ON branches(city);
@@ -223,7 +169,7 @@ const initializeDatabase = async () => {
       }
 
       // Check if departments table exists
-      const departmentsExists = await pool.query(`
+      const departmentsExists = await client.query(`
   SELECT EXISTS (
     SELECT FROM information_schema.tables 
     WHERE table_schema = 'public' 
@@ -233,7 +179,7 @@ const initializeDatabase = async () => {
 
       if (!departmentsExists.rows[0].exists) {
         console.log('📁 Creating departments table...');
-        await pool.query(`
+        await client.query(`
     CREATE TABLE departments (
       id SERIAL PRIMARY KEY,
       branch_id INTEGER NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
@@ -257,7 +203,7 @@ const initializeDatabase = async () => {
         console.log('✅ Departments table created');
 
         // Create indexes for departments table
-        await pool.query(`
+        await client.query(`
     CREATE INDEX idx_departments_branch_id ON departments(branch_id);
     CREATE INDEX idx_departments_type ON departments(type);
     CREATE INDEX idx_departments_head_id ON departments(head_id);
@@ -444,7 +390,8 @@ const initializeDatabase = async () => {
   } catch (error) {
     console.error('❌ Database initialization error:', error.message);
     console.error('Error details:', error);
-    throw error; // Re-throw to be caught by startServer
+  } finally {
+    client.release();
   }
 };
 
@@ -455,17 +402,12 @@ const startServer = async () => {
     await initializeDatabase();
     console.log('🔄 Initializing database...');
     
-    // FIX: Check if initializeDatabases exists (now attached to pool)
-    if (initializeDatabases && typeof initializeDatabases === 'function') {
-      const dbResult = await initializeDatabases();
-      
-      if (dbResult && dbResult.success) {
-        console.log('✅ Database initialized successfully');
-      } else {
-        console.warn('⚠️ Database initialization had issues, but continuing...');
-      }
+    const dbResult = await initializeDatabases();
+    
+    if (dbResult.success) {
+      console.log('✅ Database initialized successfully');
     } else {
-      console.log('⚠️ initializeDatabases function not found, using direct pool connection');
+      console.warn('⚠️ Database initialization had issues, but continuing...');
     }
 
     // Routes
@@ -477,6 +419,39 @@ const startServer = async () => {
     app.use('/api/suppliers', supplierRoutes);
     app.use('/api/stocks', stockRoutes);
     app.use('/api/transactions', transactionRoutes);
+
+    // Health check endpoint
+ app.get("/api/health", (req, res) => {
+    res.status(200).json({
+        status: "healthy",
+        database: "connected", 
+        timestamp: new Date().toISOString(),
+        server: "AWS EC2",
+        nodeVersion: process.version
+    });
+});
+
+
+    // API Documentation
+    app.get('/', (req, res) => {
+      res.json({
+        message: 'Dubai Mobiles Backend API',
+        version: '1.0.0',
+        endpoints: {
+          auth: {
+            register: 'POST /api/auth/register',
+            login: 'POST /api/auth/login',
+            profile: 'GET /api/auth/profile',
+            users: 'GET /api/auth/users (admin only)',
+            updateRole: 'PATCH /api/auth/users/:id/role (admin only)',
+            deleteUser: 'DELETE /api/auth/users/:id (admin only)',
+            adminDashboard: 'GET /api/auth/admin-dashboard (admin/manager)'
+          },
+          health: 'GET /health'
+        },
+        note: 'For admin routes, include Authorization header: Bearer <token>'
+      });
+    });
 
     // Error handling middleware
     app.use((err, req, res, next) => {
@@ -500,7 +475,6 @@ const startServer = async () => {
       console.log(`🚀 Server running on port ${PORT}`);
       console.log(`🌐 http://localhost:${PORT}`);
       console.log(`📚 API Documentation: http://localhost:${PORT}`);
-      console.log(`🩺 Health check: http://localhost:${PORT}/api/health`);
     });
 
   } catch (error) {
