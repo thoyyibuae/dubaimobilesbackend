@@ -171,6 +171,7 @@ const createTransactionTable = async () => {
   }
 };
 
+
 // Create indexes for transactions table
 const createTransactionIndexes = async () => {
   try {

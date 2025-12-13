@@ -1,5 +1,4 @@
-// server.js
-
+// server.js - CORRECTED IMPORTS
 
 const express = require('express');
 const cors = require('cors');
@@ -14,7 +13,12 @@ const categoryRoutes = require('./routes/categoryRoutes');
 const supplierRoutes = require('./routes/supplierRoutes');
 const stockRoutes = require('./routes/stockRoute');
 const transactionRoutes = require('./routes/transactionRoutes');
-const { initializeDatabases } = require('./config/database');
+
+// FIX: Import database correctly - pool is the default export
+const pool = require('./config/database');
+
+// FIX: Get initializeDatabases from pool object (it's attached to pool)
+const initializeDatabases = pool.initializeDatabases;
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -45,18 +49,15 @@ if (!process.env.JWT_SECRET) {
   process.exit(1);
 }
 
-// Import database config
-const pool = require('./config/database');
-
 // Database initialization function
 const initializeDatabase = async () => {
-  const client = await pool.connect();
-
+  // FIX: Use pool.query instead of pool.connect() for simple operations
+  // OR if you need a client, use pool.connect() properly
   try {
     console.log('🔄 Initializing database schema...');
 
     // First, check if users table exists
-    const tableExists = await client.query(`
+    const tableExists = await pool.query(`
       SELECT EXISTS (
         SELECT FROM information_schema.tables 
         WHERE table_schema = 'public' 
@@ -67,7 +68,7 @@ const initializeDatabase = async () => {
     if (!tableExists.rows[0].exists) {
       // Create users table with all columns
       console.log('📁 Creating users table...');
-      await client.query(`
+      await pool.query(`
         CREATE TABLE users (
           id SERIAL PRIMARY KEY,
           name VARCHAR(100) NOT NULL,
@@ -83,7 +84,7 @@ const initializeDatabase = async () => {
     } else {
       // Check if role column exists
       console.log('📊 Checking table structure...');
-      const columns = await client.query(`
+      const columns = await pool.query(`
         SELECT column_name 
         FROM information_schema.columns 
         WHERE table_name = 'users' 
@@ -95,13 +96,13 @@ const initializeDatabase = async () => {
       // Add role column if it doesn't exist
       if (!columnNames.includes('role')) {
         console.log('➕ Adding role column to users table...');
-        await client.query(`
+        await pool.query(`
           ALTER TABLE users 
           ADD COLUMN role VARCHAR(20) DEFAULT 'user'
         `);
 
         // Add constraint separately
-        await client.query(`
+        await pool.query(`
           ALTER TABLE users 
           ADD CONSTRAINT valid_role CHECK (role IN ('user', 'admin', 'manager', 'staff'))
         `);
@@ -109,7 +110,7 @@ const initializeDatabase = async () => {
       }
 
       // Check if branches table exists
-      const branchesTableExists = await client.query(`
+      const branchesTableExists = await pool.query(`
       SELECT EXISTS (
         SELECT FROM information_schema.tables 
         WHERE table_schema = 'public' 
@@ -120,7 +121,7 @@ const initializeDatabase = async () => {
       if (!branchesTableExists.rows[0].exists) {
         // Create branches table
         console.log('📁 Creating branches table...');
-        await client.query(`
+        await pool.query(`
         CREATE TABLE branches (
           id SERIAL PRIMARY KEY,
           name VARCHAR(255) NOT NULL,
@@ -159,7 +160,7 @@ const initializeDatabase = async () => {
         console.log('✅ Branches table created');
 
         // Create indexes
-        await client.query(`
+        await pool.query(`
         CREATE INDEX idx_branches_status ON branches(status);
         CREATE INDEX idx_branches_country ON branches(country);
         CREATE INDEX idx_branches_city ON branches(city);
@@ -169,7 +170,7 @@ const initializeDatabase = async () => {
       }
 
       // Check if departments table exists
-      const departmentsExists = await client.query(`
+      const departmentsExists = await pool.query(`
   SELECT EXISTS (
     SELECT FROM information_schema.tables 
     WHERE table_schema = 'public' 
@@ -179,7 +180,7 @@ const initializeDatabase = async () => {
 
       if (!departmentsExists.rows[0].exists) {
         console.log('📁 Creating departments table...');
-        await client.query(`
+        await pool.query(`
     CREATE TABLE departments (
       id SERIAL PRIMARY KEY,
       branch_id INTEGER NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
@@ -203,7 +204,7 @@ const initializeDatabase = async () => {
         console.log('✅ Departments table created');
 
         // Create indexes for departments table
-        await client.query(`
+        await pool.query(`
     CREATE INDEX idx_departments_branch_id ON departments(branch_id);
     CREATE INDEX idx_departments_type ON departments(type);
     CREATE INDEX idx_departments_head_id ON departments(head_id);
@@ -390,8 +391,7 @@ const initializeDatabase = async () => {
   } catch (error) {
     console.error('❌ Database initialization error:', error.message);
     console.error('Error details:', error);
-  } finally {
-    client.release();
+    throw error; // Re-throw to be caught by startServer
   }
 };
 
@@ -402,12 +402,17 @@ const startServer = async () => {
     await initializeDatabase();
     console.log('🔄 Initializing database...');
     
-    const dbResult = await initializeDatabases();
-    
-    if (dbResult.success) {
-      console.log('✅ Database initialized successfully');
+    // FIX: Check if initializeDatabases exists (now attached to pool)
+    if (initializeDatabases && typeof initializeDatabases === 'function') {
+      const dbResult = await initializeDatabases();
+      
+      if (dbResult && dbResult.success) {
+        console.log('✅ Database initialized successfully');
+      } else {
+        console.warn('⚠️ Database initialization had issues, but continuing...');
+      }
     } else {
-      console.warn('⚠️ Database initialization had issues, but continuing...');
+      console.log('⚠️ initializeDatabases function not found, using direct pool connection');
     }
 
     // Routes
@@ -421,13 +426,14 @@ const startServer = async () => {
     app.use('/api/transactions', transactionRoutes);
 
     // Health check endpoint
-    app.get('/health', async (req, res) => {
+    app.get('/api/health', async (req, res) => {
       try {
         await pool.query('SELECT 1');
         res.json({
           status: 'healthy',
           database: 'connected',
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          server: 'Development'
         });
       } catch (error) {
         res.status(503).json({
@@ -439,7 +445,7 @@ const startServer = async () => {
     });
 
     // API Documentation
-    app.get('/', (req, res) => {
+    app.get('/api/docs', (req, res) => {
       res.json({
         message: 'Dubai Mobiles Backend API',
         version: '1.0.0',
@@ -453,9 +459,24 @@ const startServer = async () => {
             deleteUser: 'DELETE /api/auth/users/:id (admin only)',
             adminDashboard: 'GET /api/auth/admin-dashboard (admin/manager)'
           },
-          health: 'GET /health'
+          health: 'GET /api/health',
+          docs: 'GET /api/docs'
         },
         note: 'For admin routes, include Authorization header: Bearer <token>'
+      });
+    });
+
+    // Root endpoint
+    app.get('/', (req, res) => {
+      res.json({
+        message: 'Dubai Mobiles Backend API',
+        status: 'running',
+        version: '1.0.0',
+        endpoints: {
+          health: '/api/health',
+          docs: '/api/docs',
+          auth: '/api/auth'
+        }
       });
     });
 
@@ -481,6 +502,7 @@ const startServer = async () => {
       console.log(`🚀 Server running on port ${PORT}`);
       console.log(`🌐 http://localhost:${PORT}`);
       console.log(`📚 API Documentation: http://localhost:${PORT}`);
+      console.log(`🩺 Health check: http://localhost:${PORT}/api/health`);
     });
 
   } catch (error) {
