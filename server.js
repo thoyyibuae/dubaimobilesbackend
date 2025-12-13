@@ -35,6 +35,59 @@ app.use(express.urlencoded({ extended: true }));
 // Serve static files from uploads directory
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
+// ============ GLOBAL HEALTH CHECK ============
+// These routes should be accessible even if database is down
+
+app.get('/api/health', async (req, res) => {
+  try {
+    // Try to query database
+    await pool.query('SELECT 1');
+    res.json({
+      status: 'healthy',
+      database: 'connected',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      environment: process.env.NODE_ENV || 'development',
+      server: 'Development'
+    });
+  } catch (error) {
+    // Database is down but server is running
+    res.status(200).json({
+      status: 'degraded',
+      database: 'disconnected',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      environment: process.env.NODE_ENV || 'development',
+      message: 'Server running without database connection',
+      error: error.message
+    });
+  }
+});
+
+// Root endpoint
+app.get('/', (req, res) => {
+  res.json({
+    message: 'Dubai Mobiles Backend API',
+    status: 'running',
+    version: '1.0.0',
+    endpoints: {
+      health: 'GET /api/health',
+      auth: '/api/auth'
+    }
+  });
+});
+
+// Simple test endpoint
+app.get('/api/test', (req, res) => {
+  res.json({
+    test: 'OK',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
+  });
+});
+
+// =============================================
+
 // Debug environment variables
 console.log('Environment Variables:');
 console.log('DB_USER:', process.env.DB_USER);
@@ -82,8 +135,6 @@ const initializeDatabase = async () => {
       `);
       console.log('✅ Users table created');
     } else {
-
-
       // Check if role column exists
       console.log('📊 Checking table structure...');
       const columns = await pool.query(`
@@ -427,63 +478,6 @@ const startServer = async () => {
     app.use('/api/stocks', stockRoutes);
     app.use('/api/transactions', transactionRoutes);
 
-
-    // Health check endpoint
-    app.get('/api/health', async (req, res) => {
-      try {
-        await pool.query('SELECT 1');
-        res.json({
-          status: 'healthy',
-          database: 'connected',
-          timestamp: new Date().toISOString(),
-          server: 'Development'
-        });
-      } catch (error) {
-        res.status(503).json({
-          status: 'unhealthy',
-          database: 'disconnected',
-          error: error.message
-        });
-      }
-    });
-
-    
-    // API Documentation
-    // app.get('/api/docs', (req, res) => {
-    //   res.json({
-    //     message: 'Dubai Mobiles Backend API',
-    //     version: '1.0.0',
-    //     endpoints: {
-    //       auth: {
-    //         register: 'POST /api/auth/register',
-    //         login: 'POST /api/auth/login',
-    //         profile: 'GET /api/auth/profile',
-    //         users: 'GET /api/auth/users (admin only)',
-    //         updateRole: 'PATCH /api/auth/users/:id/role (admin only)',
-    //         deleteUser: 'DELETE /api/auth/users/:id (admin only)',
-    //         adminDashboard: 'GET /api/auth/admin-dashboard (admin/manager)'
-    //       },
-    //       health: 'GET /api/health',
-    //       docs: 'GET /api/docs'
-    //     },
-    //     note: 'For admin routes, include Authorization header: Bearer <token>'
-    //   });
-    // });
-
-    // Root endpoint
-    // app.get('/', (req, res) => {
-    //   res.json({
-    //     message: 'Dubai Mobiles Backend API',
-    //     status: 'running',
-    //     version: '1.0.0',
-    //     endpoints: {
-    //       health: '/api/health',
-    //       docs: '/api/docs',
-    //       auth: '/api/auth'
-    //     }
-    //   });
-    // });
-
     // Error handling middleware
     app.use((err, req, res, next) => {
       console.error('Server error:', err);
@@ -500,7 +494,6 @@ const startServer = async () => {
 
       res.status(500).json({ error: 'Internal server error' });
     });
-
 
     const PORT = process.env.PORT || 3000;
     app.listen(PORT, () => {
