@@ -1,0 +1,14 @@
+# Dependencies
+node_modules/
+
+# Environment
+
+
+# Windows system files
+Thumbs.db
+Desktop.ini
+
+# Editor files (if using VS Code on Windows)
+.vscode/
+*.swp
+*.swo
