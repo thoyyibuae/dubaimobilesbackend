@@ -5,7 +5,6 @@ const transactionController = require('../controller/transaction_controller');
 // Create a new transaction
 router.post('/', transactionController.createTransaction);
 
-
 // Get all transactions with filtering and pagination
 router.get('/', transactionController.getTransactions);
 
