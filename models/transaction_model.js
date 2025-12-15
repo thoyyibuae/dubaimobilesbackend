@@ -246,6 +246,7 @@ module.exports = {
     // ... (keep all existing methods: create, getAll, getById, update, delete, formatTransaction) ...
 
     // Get comprehensive transactions summary/statistics with clear credit/debit difference
+   
     async getSummary(filters = {}) {
         try {
             // Build WHERE conditions
@@ -721,6 +722,7 @@ module.exports = {
         throw error;
     }
 }
+
 
 
 };
