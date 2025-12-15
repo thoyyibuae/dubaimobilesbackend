@@ -2,6 +2,20 @@ const express = require('express');
 const router = express.Router();
 const transactionController = require('../controller/transaction_controller');
 
+// ✅ FIXED: Summary route should come BEFORE parameterized routes
+// Get transactions summary/statistics
+router.get('/summary', transactionController.getTransactionsSummary);
+
+// Get recent transactions
+router.get('/recent', transactionController.getRecentTransactions);
+
+// Get transactions by date range
+router.get('/date-range', transactionController.getTransactionsByDateRange);
+
+// Get transactions by person name
+router.get('/person/:personName', transactionController.getTransactionsByPerson);
+
+// ✅ FIXED: Standard CRUD routes in correct order
 // Create a new transaction
 router.post('/', transactionController.createTransaction);
 
@@ -16,17 +30,5 @@ router.put('/:id', transactionController.updateTransaction);
 
 // Delete transaction
 router.delete('/:id', transactionController.deleteTransaction);
-
-// Get transactions summary/statistics
-router.get('/summary/summary', transactionController.getTransactionsSummary);
-
-// Get transactions by person name
-router.get('/person/:personName', transactionController.getTransactionsByPerson);
-
-// Get recent transactions
-router.get('/recent/recent', transactionController.getRecentTransactions);
-
-// Get transactions by date range
-router.get('/date-range/range', transactionController.getTransactionsByDateRange);
 
 module.exports = router;

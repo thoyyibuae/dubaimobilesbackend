@@ -242,6 +242,10 @@ module.exports = {
     },
 
     // Get comprehensive transactions summary/statistics with clear credit/debit difference
+
+    // ... (keep all existing methods: create, getAll, getById, update, delete, formatTransaction) ...
+
+    // Get comprehensive transactions summary/statistics with clear credit/debit difference
     async getSummary(filters = {}) {
         try {
             // Build WHERE conditions
@@ -260,9 +264,14 @@ module.exports = {
             params.push(new Date(endDate));
         }
 
-        const whereClause = whereConditions.length > 0 
-            ? `WHERE ${whereConditions.join(' AND ')}` 
-            : '';
+        // FIX: Build WHERE clause properly
+        let whereClause = '';
+        let subWhereClause = '';
+        
+        if (whereConditions.length > 0) {
+            whereClause = `WHERE ${whereConditions.join(' AND ')}`;
+            subWhereClause = `AND ${whereConditions.join(' AND ')}`;
+        }
 
         // Query 1: Get overall summary with enhanced credit/debit comparison
         const overallQuery = `
@@ -279,7 +288,7 @@ module.exports = {
                 STDDEV(amount) as amount_stddev,
                 PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY amount) as median_amount,
                 
-                -- NEW: Enhanced credit/debit comparison
+                -- Enhanced credit/debit comparison
                 CASE 
                     WHEN SUM(CASE WHEN type = 'CREDIT' THEN amount ELSE 0 END) > SUM(CASE WHEN type = 'DEBIT' THEN amount ELSE 0 END) 
                     THEN 'CREDIT_HIGHER' 
@@ -288,17 +297,17 @@ module.exports = {
                     ELSE 'EQUAL' 
                 END as comparison_status,
                 
-                -- NEW: Absolute difference
+                -- Absolute difference
                 ABS(SUM(CASE WHEN type = 'CREDIT' THEN amount ELSE 0 END) - SUM(CASE WHEN type = 'DEBIT' THEN amount ELSE 0 END)) as absolute_difference,
                 
-                -- NEW: Which is more and by how much
+                -- Which is more and by how much
                 CASE 
                     WHEN SUM(CASE WHEN type = 'CREDIT' THEN amount ELSE 0 END) > SUM(CASE WHEN type = 'DEBIT' THEN amount ELSE 0 END) 
                     THEN SUM(CASE WHEN type = 'CREDIT' THEN amount ELSE 0 END) - SUM(CASE WHEN type = 'DEBIT' THEN amount ELSE 0 END)
                     ELSE SUM(CASE WHEN type = 'DEBIT' THEN amount ELSE 0 END) - SUM(CASE WHEN type = 'CREDIT' THEN amount ELSE 0 END)
                 END as difference_amount,
                 
-                -- NEW: Percentage of total
+                -- Percentage of total
                 CASE 
                     WHEN SUM(amount) > 0 
                     THEN (SUM(CASE WHEN type = 'CREDIT' THEN amount ELSE 0 END) * 100.0 / SUM(amount))
@@ -349,7 +358,7 @@ module.exports = {
             statusMessage = 'Credit and Debit are Equal';
         }
 
-        // Query 2: Get summary by type with percentages
+        // Query 2: Get summary by type with percentages - FIXED subquery
         const byTypeQuery = `
             SELECT 
                 type,
@@ -359,7 +368,7 @@ module.exports = {
                 MIN(amount) as min_amount,
                 MAX(amount) as max_amount,
                 (COUNT(*) * 100.0 / (SELECT COUNT(*) FROM transactions ${whereClause})) as percentage_count,
-                (SUM(amount) * 100.0 / (SELECT SUM(amount) FROM transactions ${whereClause} WHERE amount > 0)) as percentage_amount
+                (SUM(amount) * 100.0 / NULLIF((SELECT SUM(amount) FROM transactions ${whereClause}), 0)) as percentage_amount
             FROM transactions
             ${whereClause}
             GROUP BY type
@@ -368,7 +377,7 @@ module.exports = {
 
         const byTypeResult = await pool.query(byTypeQuery, params);
 
-        // Query 3: Get daily summary (last 30 days) with balance
+        // Query 3: Get daily summary (last 30 days) with balance - FIXED WHERE clause
         const dailySummaryQuery = `
             SELECT 
                 DATE(timestamp) as date,
@@ -378,7 +387,8 @@ module.exports = {
                 SUM(CASE WHEN type = 'DEBIT' THEN amount ELSE 0 END) as daily_debit,
                 SUM(CASE WHEN type = 'CREDIT' THEN amount ELSE 0 END) - SUM(CASE WHEN type = 'DEBIT' THEN amount ELSE 0 END) as daily_balance
             FROM transactions
-            ${whereClause} AND timestamp >= CURRENT_DATE - INTERVAL '30 days'
+            WHERE timestamp >= CURRENT_DATE - INTERVAL '30 days'
+            ${whereConditions.length > 0 ? `AND ${whereConditions.join(' AND ')}` : ''}
             GROUP BY DATE(timestamp)
             ORDER BY date DESC
             LIMIT 30
@@ -386,7 +396,7 @@ module.exports = {
 
         const dailySummaryResult = await pool.query(dailySummaryQuery, params);
 
-        // Query 4: Get top persons (both from and to) with balance
+        // Query 4: Get top persons (both from and to) with balance - FIXED WHERE clause
         const topPersonsQuery = `
             WITH person_transactions AS (
                 SELECT from_person as person, amount, type, timestamp FROM transactions
@@ -401,7 +411,7 @@ module.exports = {
                 SUM(CASE WHEN type = 'DEBIT' THEN amount ELSE 0 END) as total_debit_given,
                 SUM(CASE WHEN type = 'CREDIT' THEN amount ELSE 0 END) - SUM(CASE WHEN type = 'DEBIT' THEN amount ELSE 0 END) as person_balance
             FROM person_transactions
-            ${whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ').replace('timestamp', 'person_transactions.timestamp')}` : ''}
+            ${whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : ''}
             GROUP BY person
             ORDER BY total_amount_involved DESC
             LIMIT 5
@@ -409,7 +419,7 @@ module.exports = {
 
         const topPersonsResult = await pool.query(topPersonsQuery, params);
 
-        // Query 5: Get recent activity (last 7 days) with balance
+        // Query 5: Get recent activity (last 7 days) with balance - FIXED WHERE clause
         const recentActivityQuery = `
             SELECT 
                 DATE(timestamp) as date,
@@ -420,14 +430,14 @@ module.exports = {
                 SUM(CASE WHEN type = 'CREDIT' THEN amount ELSE 0 END) - SUM(CASE WHEN type = 'DEBIT' THEN amount ELSE 0 END) as daily_balance
             FROM transactions
             WHERE timestamp >= CURRENT_DATE - INTERVAL '7 days'
-            ${startDate || endDate ? 'AND ' + whereClause.substring(5) : ''}
+            ${whereConditions.length > 0 ? `AND ${whereConditions.join(' AND ')}` : ''}
             GROUP BY DATE(timestamp)
             ORDER BY date
         `;
 
         const recentActivityResult = await pool.query(recentActivityQuery, params);
 
-        // Query 6: Get amount distribution with credit/debit breakdown
+        // Query 6: Get amount distribution with credit/debit breakdown - FIXED subquery
         const amountDistributionQuery = `
             SELECT 
                 CASE
@@ -441,7 +451,7 @@ module.exports = {
                 SUM(amount) as total_amount,
                 SUM(CASE WHEN type = 'CREDIT' THEN amount ELSE 0 END) as credit_amount,
                 SUM(CASE WHEN type = 'DEBIT' THEN amount ELSE 0 END) as debit_amount,
-                (COUNT(*) * 100.0 / (SELECT COUNT(*) FROM transactions ${whereClause})) as percentage
+                (COUNT(*) * 100.0 / NULLIF((SELECT COUNT(*) FROM transactions ${whereClause}), 0)) as percentage
             FROM transactions
             ${whereClause}
             GROUP BY 
@@ -562,8 +572,8 @@ module.exports = {
                 average_amount: parseFloat(row.average_amount || 0),
                 min_amount: parseFloat(row.min_amount || 0),
                 max_amount: parseFloat(row.max_amount || 0),
-                percentage_count: parseFloat(row.percentage_count || 0),
-                percentage_amount: parseFloat(row.percentage_amount || 0),
+                percentage_count: parseFloat(row.percentage_count || 0) || 0,
+                percentage_amount: parseFloat(row.percentage_amount || 0) || 0,
                 formatted_amount: `₹${parseFloat(row.total_amount || 0).toFixed(2)}`
             })),
 
@@ -608,7 +618,7 @@ module.exports = {
                 total_amount: parseFloat(row.total_amount || 0),
                 credit_amount: parseFloat(row.credit_amount || 0),
                 debit_amount: parseFloat(row.debit_amount || 0),
-                percentage: parseFloat(row.percentage || 0),
+                percentage: parseFloat(row.percentage || 0) || 0,
                 credit_debit_ratio: parseFloat(row.debit_amount || 0) > 0 ? 
                     (parseFloat(row.credit_amount || 0) / parseFloat(row.debit_amount || 0)).toFixed(2) : "N/A"
             })),
@@ -683,26 +693,6 @@ module.exports = {
                         value: parseInt(overall?.debit_count || 0) > 0 ? `₹${(totalDebit / parseInt(overall?.debit_count || 0)).toFixed(2)}` : "₹0.00",
                         description: "Average amount per DEBIT"
                     }
-                ],
-                
-                // Insights
-                insights: [
-                    {
-                        type: "CREDIT_DEBIT_COMPARISON",
-                        title: "Credit vs Debit Analysis",
-                        description: higherMessage,
-                        severity: Math.abs(totalCredit - totalDebit) > (totalAmount * 0.1) ? "HIGH" : "LOW"
-                    },
-                    {
-                        type: "BALANCE_STATUS",
-                        title: "Financial Position",
-                        description: totalCredit > totalDebit ? 
-                            "You have more Credit than Debit (Favorable)" : 
-                            totalDebit > totalCredit ? 
-                            "You have more Debit than Credit (Review Needed)" : 
-                            "Credit and Debit are balanced",
-                        severity: totalDebit > totalCredit ? "WARNING" : "INFO"
-                    }
                 ]
             },
 
@@ -716,7 +706,7 @@ module.exports = {
                 },
                 generated_at: new Date().toISOString(),
                 filters_applied: Object.keys(filters).filter(key => filters[key]),
-                summary_version: '3.1',
+                summary_version: '3.2',
                 calculation_notes: [
                     "Net Balance = Total Credit - Total Debit",
                     "Positive Balance = More Credit than Debit",
@@ -731,4 +721,6 @@ module.exports = {
         throw error;
     }
 }
+
+
 };

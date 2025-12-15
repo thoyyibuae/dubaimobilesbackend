@@ -418,7 +418,7 @@ const startServer = async () => {
     app.use('/api/categories', categoryRoutes);
     app.use('/api/suppliers', supplierRoutes);
     app.use('/api/stocks', stockRoutes);
-    app.use('/api/transactions', transactionRoutes);
+    app.use('/api/transactions/user', transactionRoutes);
 
     // Health check endpoint
  app.get("/api/health", (req, res) => {
