@@ -395,6 +395,7 @@ const initializeDatabase = async () => {
   }
 };
 
+
 // Initialize database before starting server
 const startServer = async () => {
   try {
@@ -410,8 +411,9 @@ const startServer = async () => {
       console.warn('⚠️ Database initialization had issues, but continuing...');
     }
 
+
     // Routes
-    app.use('/api/auth', authRoutes);
+    app.use('/api/auth/admin', authRoutes);
     app.use('/api/branches', branchRoutes);
     app.use('/api/departments', departmentRoutes);
     app.use('/api/brands', brandRoutes);
