@@ -14,7 +14,17 @@ const categoryRoutes = require('./routes/categoryRoutes');
 const supplierRoutes = require('./routes/supplierRoutes');
 const stockRoutes = require('./routes/stockRoute');
 const transactionRoutes = require('./routes/transactionRoutes');
+
+const normalUserRoutes = require('./routes/normal_user_routes');
+
+
 const { initializeDatabases } = require('./config/database');
+
+const { createNormalUsersTable, testConnection } = require('./config/normal_users_db');
+
+
+
+
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -411,6 +421,14 @@ const startServer = async () => {
       console.warn('⚠️ Database initialization had issues, but continuing...');
     }
 
+     const resultcreateNormalUsersTable = await createNormalUsersTable();
+    if (resultcreateNormalUsersTable.success) {
+      console.log('✅ Database initialized successfully');
+    } else {
+      console.warn('⚠️ Database initialization had issues, but continuing...');
+    }
+
+
 
     // Routes
     app.use('/api/auth/admin', authRoutes);
@@ -421,6 +439,8 @@ const startServer = async () => {
     app.use('/api/suppliers', supplierRoutes);
     app.use('/api/stocks', stockRoutes);
     app.use('/api/transactions/user', transactionRoutes);
+    app.use('/api/normal-users', normalUserRoutes);
+
 
     // Health check endpoint
  app.get("/api/health", (req, res) => {
@@ -432,6 +452,9 @@ const startServer = async () => {
         nodeVersion: process.version
     });
 });
+
+
+
 
 
     // API Documentation

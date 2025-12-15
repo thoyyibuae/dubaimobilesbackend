@@ -153,6 +153,10 @@ router.post('/login', async (req, res) => {
 // Get current user profile
 router.get('/profile', authenticateToken, async (req, res) => {
   try {
+        
+    console.log( req.user.userId);
+
+    // console.log("name"+name);
     const user = await User.findById(req.user.userId);
     if (!user) {
       return res.status(404).json({ 
@@ -160,6 +164,7 @@ router.get('/profile', authenticateToken, async (req, res) => {
         error: 'User not found' 
       });
     }
+    
     
     // Remove password from response
     delete user.password;
@@ -182,6 +187,7 @@ router.put('/profile', authenticateToken, async (req, res) => {
   try {
     const { name } = req.body;
     
+    console.log( req.user.userId);
 
     console.log("name"+name);
     if (!name) {
