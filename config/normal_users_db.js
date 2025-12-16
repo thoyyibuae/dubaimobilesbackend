@@ -90,16 +90,17 @@ const createNormalUsersTable = async () => {
         SELECT COUNT(*) as count FROM normal_users WHERE email = 'test@example.com'
       `);
       
-      if (parseInt(sampleDataCheck.rows[0].count) === 0) {
-        await client.query(`
-          INSERT INTO normal_users (name, email, phone, role, status) 
-          VALUES 
-            ('John Doe', 'test@example.com', '+1234567890', 'user', 'active'),
-            ('Jane Smith', 'jane@example.com', '+9876543210', 'admin', 'active'),
-            ('Bob Wilson', 'bob@example.com', '+1122334455', 'staff', 'active')
-        `);
-        console.log('✅ Sample data inserted');
-      }
+      // if (parseInt(sampleDataCheck.rows[0].count) === 0) {
+      //   await client.query(`
+      //     INSERT INTO normal_users (name, email, phone, role, status) 
+      //     VALUES 
+      //       ('John Doe', 'test@example.com', '+1234567890', 'user', 'active'),
+      //       ('Jane Smith', 'jane@example.com', '+9876543210', 'admin', 'active'),
+      //       ('Bob Wilson', 'bob@example.com', '+1122334455', 'staff', 'active')
+      //   `);
+      //   console.log('✅ Sample data inserted');
+      // }
+      
     } catch (sampleError) {
       console.log('⚠️  Sample data not inserted (already exists or error)');
     }
