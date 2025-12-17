@@ -49,7 +49,7 @@ exports.createStock = async (req, res) => {
 exports.getStocks = async (req, res) => {
     try {
         const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 20;
+        const limit = parseInt(req.query.limit) || 10;
         const search = req.query.search || "";
         const branchId = req.query.branchId || null;
         const categoryId = req.query.categoryId || null;
