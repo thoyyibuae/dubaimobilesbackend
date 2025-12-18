@@ -46,6 +46,8 @@ exports.createStock = async (req, res) => {
 
 
 
+
+
 exports.getStocks = async (req, res) => {
     try {
         const page = parseInt(req.query.page) || 1;
@@ -109,29 +111,84 @@ exports.updateStock = async (req, res) => {
     try {
         const body = req.body;
 
-        const images =
-            req.files?.map(file => `/uploads/stocks/${file.filename}`) || [];
+        // Debug logging
+        console.log('Update request body:', body);
+        console.log('Update request params:', req.params);
+        console.log('Files:', req.files);
 
+        // Handle images - keep existing if no new images uploaded
+        let images = [];
+        
+        // Parse existing images if provided as string
+        if (body.images) {
+            if (typeof body.images === 'string') {
+                try {
+                    images = JSON.parse(body.images);
+                } catch (e) {
+                    images = [body.images];
+                }
+            } else if (Array.isArray(body.images)) {
+                images = body.images;
+            }
+        }
+        
+        // If new files are uploaded, use them
+        if (req.files && req.files.length > 0) {
+            const newImages = req.files.map(file => `/uploads/stocks/${file.filename}`);
+            images = [...images, ...newImages]; // Combine existing and new images
+        }
+        
+        // Parse specifications if provided
         const specifications = body.specifications
-            ? JSON.parse(body.specifications)
+            ? (typeof body.specifications === 'string' 
+                ? JSON.parse(body.specifications) 
+                : body.specifications)
             : {};
 
+        // Prepare stock object with proper field names
         const stock = {
-            ...body,
-            images,
-            specifications
+            name: body.name,
+            sku: body.sku,
+            description: body.description,
+            category_id: parseInt(body.category_id) || null,
+            brand_id: parseInt(body.brand_id) || null,
+            branch_id: parseInt(body.branch_id) || null,
+            supplier_id: parseInt(body.supplier_id) || null,
+            cost_price: parseFloat(body.cost_price) || 0.0,
+            selling_price: parseFloat(body.selling_price) || 0.0,
+            dealer_price: parseFloat(body.dealer_price) || 0.0,
+            shop_price: parseFloat(body.shop_price) || 0.0,
+            quantity: parseInt(body.quantity) || 0,
+            low_stock_threshold: parseInt(body.low_stock_threshold) || 0,
+            unit: body.unit || 'pcs',
+            status: body.status || 'active',
+            images: images,
+            specifications: specifications
         };
 
+        console.log('Stock object for update:', stock);
+        
+        // Update the stock
         const updated = await Stock.update(req.params.id, stock);
+        
+        // Get the updated record with basic details
+        const fullRecord = await Stock.findByIdWithBasicDetails(updated.id);
 
         res.json({
             message: "Stock updated successfully",
-            data: updated,
+            data: fullRecord,
         });
     } catch (err) {
-        res.status(500).json({ error: "Failed to update stock" });
+        console.error('Update stock error:', err.message);
+        console.error('Error stack:', err.stack);
+        res.status(500).json({ 
+            error: "Failed to update stock",
+            details: err.message 
+        });
     }
 };
+
+
 
 exports.deleteStock = async (req, res) => {
     try {
