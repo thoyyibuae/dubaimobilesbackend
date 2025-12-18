@@ -87,6 +87,7 @@ router.post('/register', async (req, res) => {
 // Login User (All roles)
 router.post('/login', async (req, res) => {
   try {
+    
     const { email, password } = req.body;
 
     if (!email || !password) {
@@ -101,7 +102,7 @@ router.post('/login', async (req, res) => {
     if (!user) {
       return res.status(401).json({ 
         success: false,
-        error: 'Invalid credentials' 
+        error: 'Invalid Email' 
       });
     }
 
@@ -110,7 +111,7 @@ router.post('/login', async (req, res) => {
     if (!isPasswordValid) {
       return res.status(401).json({ 
         success: false,
-        error: 'Invalid credentials' 
+        error: 'Invalid Password' 
       });
     }
 

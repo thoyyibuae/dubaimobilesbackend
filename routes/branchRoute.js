@@ -72,6 +72,8 @@ router.post(
   validateBranchData,
   async (req, res) => {
     try {
+
+      console.log(req.user,"==============");
       console.log('Creating branch:', req.body);
       
       // Check if branch code already exists

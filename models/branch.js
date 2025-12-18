@@ -42,6 +42,8 @@ static async create(branchData) {
     name, code, latitude, longitude, openingDate
   });
 
+  
+
   const query = `
     INSERT INTO branches (
       name, code, address, city, state, country, postal_code, 

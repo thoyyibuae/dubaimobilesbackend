@@ -1,11 +1,13 @@
 const jwt = require('jsonwebtoken');
 
+
 // Middleware to verify JWT token
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
   if (!token) {
+    console.log();
     return res.status(401).json({ error: 'Access token required' });
   }
 
