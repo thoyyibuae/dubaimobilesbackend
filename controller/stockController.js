@@ -48,20 +48,29 @@ exports.createStock = async (req, res) => {
 
 
 
+
 exports.getStocks = async (req, res) => {
     try {
         const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 10;
+        const limit = parseInt(req.query.limit);
         const search = req.query.search || "";
         const branchId = req.query.branchId || null;
         const categoryId = req.query.categoryId || null;
         const brandId = req.query.brandId || null;
-         const suppilerId = req.query.suppilerId || null;
+        const suppilerId = req.query.suppilerId || null;
 
         const offset = (page - 1) * limit;
 
-        // Call model function with filters
-        const { data, total } = await Stock.getAll({ search, branchId, categoryId, brandId,suppilerId, offset, limit });
+        // Call model function with filters - NOW INCLUDES STATISTICS
+        const { data, total, statistics } = await Stock.getAll({ 
+            search, 
+            branchId, 
+            categoryId, 
+            brandId, 
+            supplierId: suppilerId, // Map suppilerId to supplierId
+            offset, 
+            limit 
+        });
 
         return res.status(200).json({
             status: true,
@@ -72,26 +81,30 @@ exports.getStocks = async (req, res) => {
                 limit,
                 total,
                 totalPages: Math.ceil(total / limit),
-                hasMore: page < Math.ceil(total / limit)
+                hasMore: page < Math.ceil(total / limit),
+                outOfStock: statistics.outOfStock,        // From ALL filtered data
+                lowStock: statistics.lowStock,            // From ALL filtered data
+                totalStockValue: statistics.totalStockValue // From ALL filtered data
             },
             filters: {
                 search: search || null,
                 branchId: branchId || null,
                 categoryId: categoryId || null,
-                 suppilerId: suppilerId || null,
+                suppilerId: suppilerId || null,
                 brandId: brandId || null
             }
         });
 
     } catch (err) {
         console.error("Get stocks error:", err);
-        return res.status(500).json({
-            status: false,
+         res.status(500).json({  status: false,
             message: "Failed to fetch stocks",
-            error: err.message
-        });
+            error: err.message });
+       
     }
 };
+
+
 
 
 
