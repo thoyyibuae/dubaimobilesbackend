@@ -7,6 +7,12 @@ class BrandController {
     try {
       const { name, description } = req.body;
       
+      const createdBy = req.user.userId;
+
+
+
+console.log(">>>>>>>>>>26"+createdBy);
+
       if (!name) {
         return res.status(400).json({ error: 'Brand name is required' });
       }
@@ -18,10 +24,12 @@ class BrandController {
       }
 
       // Get uploaded file
+   
       const iconImage = req.file ? req.file.filename : null;
 
+
       // Create brand
-      const brand = await Brand.create(name, description, iconImage);
+      const brand = await Brand.create(name, description, iconImage,createdBy);
 
       // Generate file URL if icon exists
       if (iconImage) {
@@ -41,7 +49,10 @@ class BrandController {
   // Get all brands
   static async getAllBrands(req, res) {
     try {
-      const brands = await Brand.findAll();
+            const createdBy = req.user?.userId;
+
+      const brands = await Brand.findAll(createdBy);
+      
       
       // Add full URLs to icon images
       const brandsWithUrls = brands.map(brand => ({

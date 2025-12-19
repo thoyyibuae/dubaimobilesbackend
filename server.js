@@ -228,10 +228,13 @@ const initializeDatabase = async () => {
         name VARCHAR(255) NOT NULL,
         description TEXT,
         icon_image VARCHAR(500),
+        created_by INTEGER,  
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
+
+
 
       // Create index for brands
       await pool.query(`
@@ -369,10 +372,14 @@ const initializeDatabase = async () => {
       status VARCHAR(20) DEFAULT 'active',
       images TEXT[] DEFAULT '{}',
       specifications JSONB DEFAULT '{}'::jsonb,
+     created_by INTEGER,  
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
   `);
+
+
+  
 
       await pool.query(`
     CREATE OR REPLACE FUNCTION update_stock_updated_at()

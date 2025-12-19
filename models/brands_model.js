@@ -2,13 +2,18 @@ const pool = require('../config/database');
 
 class Brand {
   // Create new brand
-  static async create(name, description, iconImage = null) {
+  static async create(name, description, iconImage = null,createdBy) {
+         // Get user ID from authentication
+
     const query = `
-      INSERT INTO brands (name, description, icon_image)
-      VALUES ($1, $2, $3)
-      RETURNING id, name, description, icon_image, created_at
+      INSERT INTO brands (name, description, icon_image,created_by)
+      VALUES ($1, $2, $3,$4)
+      RETURNING id, name, description, icon_image, created_at,
+      created_by
     `;
-    const values = [name, description, iconImage];
+
+    const values = [name, description, iconImage,createdBy];
+
     
     try {
       const result = await pool.query(query, values);
@@ -18,16 +23,30 @@ class Brand {
     }
   }
 
+  
   // Get all brands
-  static async findAll() {
-    const query = `
-      SELECT id, name, description, icon_image, created_at, updated_at
+  static async findAll(createdBy) {
+    
+    // const query = `
+    //   SELECT id, name, description, icon_image, created_at, updated_at
+    //   FROM brands
+    //   ORDER BY created_at DESC
+    //     WHERE 1=1
+    //   AND created_by = $1  -- Add filter for created_by
+    // `;
+
+      const query = `
+      SELECT id, name, description, icon_image, created_by, created_at, updated_at
       FROM brands
+      WHERE 1=1
+      AND created_by = $1  -- Add filter for created_by
       ORDER BY created_at DESC
     `;
     
+    
     try {
-      const result = await pool.query(query);
+      
+      const result = await pool.query(query,[createdBy]);
       return result.rows;
     } catch (error) {
       throw error;

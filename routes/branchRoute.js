@@ -138,9 +138,233 @@ router.post(
 
 // GET ALL BRANCHES (with filters and pagination)
 // GET ALL BRANCHES (with proper department details - FIXED)
+// router.get('/', authenticateToken, async (req, res) => {
+
+//   console.log("143 >>>>>>");
+// console.log(req.user.userId);
+
+//   try {
+//     const { 
+//       page = 1, 
+//       limit = 20, 
+//       status, 
+//       country, 
+//       city, 
+//       search,
+//       sortBy = 'created_at',
+//       sortOrder = 'DESC'
+//     } = req.query;
+
+//     console.log("143 >>>>>>");
+// console.log(req.user.userId);
+// //  "created_by": "1",
+//     // First, get branches with counts
+//     let query = `
+//       SELECT 
+//         b.*,
+//         (
+//           SELECT COUNT(*) 
+//           FROM departments d 
+//           WHERE d.branch_id = b.id
+//         ) as department_count
+//       FROM branches b
+//       WHERE 1=1
+//        AND b.created_by = $1 
+//     `;
+    
+//     const params = [];
+//     let paramCount = 1;
+
+//     // Apply filters
+//     if (status) {
+//       query += ` AND b.status = $${paramCount}`;
+//       params.push(status.toLowerCase());
+//       paramCount++;
+//     }
+
+//     if (country) {
+//       query += ` AND b.country = $${paramCount}`;
+//       params.push(country);
+//       paramCount++;
+//     }
+
+//     if (city) {
+//       query += ` AND b.city = $${paramCount}`;
+//       params.push(city);
+//       paramCount++;
+//     }
+
+//     if (search) {
+//       query += ` AND (
+//         b.name ILIKE $${paramCount} OR 
+//         b.code ILIKE $${paramCount} OR 
+//         b.city ILIKE $${paramCount} OR 
+//         b.email ILIKE $${paramCount}
+//       )`;
+//       params.push(`%${search}%`);
+//       paramCount++;
+//     }
+
+//     // Add sorting
+//     const validSortColumns = ['name', 'code', 'city', 'country', 'status', 'created_at', 'opening_date'];
+//     const sortColumn = validSortColumns.includes(sortBy) ? sortBy : 'created_at';
+//     const order = sortOrder.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+    
+//     query += ` ORDER BY b.${sortColumn} ${order}`;
+
+//     // Get total count
+//     let countQuery = `
+//       SELECT COUNT(*) 
+//       FROM branches b
+//       WHERE 1=1
+//        AND b.created_by = $1 
+//     `;
+    
+//     const countParams = [];
+//     let countParamCount = 1;
+
+//     if (status) {
+//       countQuery += ` AND b.status = $${countParamCount}`;
+//       countParams.push(status.toLowerCase());
+//       countParamCount++;
+//     }
+
+//     if (country) {
+//       countQuery += ` AND b.country = $${countParamCount}`;
+//       countParams.push(country);
+//       countParamCount++;
+//     }
+
+//     if (city) {
+//       countQuery += ` AND b.city = $${countParamCount}`;
+//       countParams.push(city);
+//       countParamCount++;
+//     }
+
+//     if (search) {
+//       countQuery += ` AND (
+//         b.name ILIKE $${countParamCount} OR 
+//         b.code ILIKE $${countParamCount} OR 
+//         b.city ILIKE $${countParamCount} OR 
+//         b.email ILIKE $${countParamCount}
+//       )`;
+//       countParams.push(`%${search}%`);
+//       countParamCount++;
+//     }
+
+//     const countResult = await pool.query(countQuery, countParams);
+//     const total = parseInt(countResult.rows[0].count);
+
+//     // Add pagination
+//     query += ` LIMIT $${paramCount} OFFSET $${paramCount + 1}`;
+//     params.push(parseInt(limit));
+//     params.push((parseInt(page) - 1) * parseInt(limit));
+
+//     const result = await pool.query(query, params);
+
+//     // Now get department details for each branch WITH PROPER TYPE CASTING
+//     const branchesWithDepartments = await Promise.all(result.rows.map(async (branch) => {
+//       try {
+//         // Get department details for this branch
+//         const departmentsQuery = `
+//           SELECT 
+//             d.id,
+//             d.branch_id as "branchId",
+//             d.type,
+//             d.name,
+//             d.head_id as "headId",
+//             d.staff_count as "staffCount",
+//             d.is_active as "isActive",
+//             d.description,
+//             d.contact_email as "contactEmail",
+//             d.contact_phone as "contactPhone",
+//             d.location,
+//             d.budget,
+//             d.created_by as "createdBy",
+//             d.created_at as "createdAt",
+//             d.updated_at as "updatedAt",
+//             u.name as "headName",
+//             u.email as "headEmail"
+//           FROM departments d
+//           LEFT JOIN users u ON u.id::text = d.head_id
+//           WHERE d.branch_id = $1
+//           ORDER BY d.name ASC
+//         `;
+
+//         const departmentsResult = await pool.query(departmentsQuery, [branch.id]);
+//         const departments = departmentsResult.rows;
+
+//         // Calculate statistics from ACTUAL department data
+//         const totalDepartments = departments.length;
+//         const activeDepartments = departments.filter(dept => dept.isActive).length;
+//         const inactiveDepartments = totalDepartments - activeDepartments;
+//         const totalStaff = departments.reduce((sum, dept) => sum + (dept.staffCount || 0), 0);
+//         const totalBudget = departments.reduce((sum, dept) => sum + (parseFloat(dept.budget) || 0), 0);
+
+//         // Create department names string
+//         const departmentNames = departments.map(dept => dept.name).join(', ');
+
+//         return {
+//           ...branch,
+//           department_count: parseInt(branch.department_count || 0),
+//           departments: departments, // Full department details
+//           department_names: departmentNames || "", // Comma-separated names
+//           department_stats: {
+//             total: totalDepartments,
+//             active: activeDepartments,
+//             inactive: inactiveDepartments,
+//             total_staff: totalStaff,
+//             total_budget: totalBudget.toFixed(2),
+//             avg_staff_per_dept: totalDepartments > 0 ? (totalStaff / totalDepartments).toFixed(1) : 0,
+//             avg_budget_per_dept: totalDepartments > 0 ? (totalBudget / totalDepartments).toFixed(2) : 0
+//           }
+//         };
+//       } catch (error) {
+//         console.error(`Error getting departments for branch ${branch.id}:`, error);
+//         // Return the branch with empty departments but keep the count
+//         return {
+//           ...branch,
+//           department_count: parseInt(branch.department_count || 0),
+//           departments: [],
+//           department_names: "",
+//           department_stats: {
+//             total: 0,
+//             active: 0,
+//             inactive: 0,
+//             total_staff: 0,
+//             total_budget: "0.00",
+//             avg_staff_per_dept: 0,
+//             avg_budget_per_dept: "0.00"
+//           }
+//         };
+//       }
+//     }));
+
+//     res.json({
+//       success: true,
+//       data: branchesWithDepartments,
+//       pagination: {
+//         total,
+//         page: parseInt(page),
+//         limit: parseInt(limit),
+//         totalPages: Math.ceil(total / parseInt(limit))
+//       }
+//     });
+    
+
+//   } catch (error) {
+//     console.error('Get branches error:', error);
+//     res.status(500).json({
+//       success: false,
+//       error: 'Failed to fetch branches'
+//     });
+//   }
+// });
+
+
+
+
 router.get('/', authenticateToken, async (req, res) => {
-
-
   try {
     const { 
       page = 1, 
@@ -153,6 +377,10 @@ router.get('/', authenticateToken, async (req, res) => {
       sortOrder = 'DESC'
     } = req.query;
 
+    // Log for debugging
+    console.log("User ID:", req.user.userId);
+    console.log("Query params:", req.query);
+
     // First, get branches with counts
     let query = `
       SELECT 
@@ -164,10 +392,12 @@ router.get('/', authenticateToken, async (req, res) => {
         ) as department_count
       FROM branches b
       WHERE 1=1
+      AND b.created_by = $1  -- Add filter for created_by
     `;
     
-    const params = [];
-    let paramCount = 1;
+    // Start parameters with user ID as first parameter
+    const params = [req.user.userId];
+    let paramCount = 2; // Start from 2 since we already have $1
 
     // Apply filters
     if (status) {
@@ -206,15 +436,16 @@ router.get('/', authenticateToken, async (req, res) => {
     
     query += ` ORDER BY b.${sortColumn} ${order}`;
 
-    // Get total count
+    // Get total count - ADD SAME FILTER FOR COUNT QUERY
     let countQuery = `
       SELECT COUNT(*) 
       FROM branches b
       WHERE 1=1
+      AND b.created_by = $1  -- Add same filter for count query
     `;
     
-    const countParams = [];
-    let countParamCount = 1;
+    const countParams = [req.user.userId];
+    let countParamCount = 2;
 
     if (status) {
       countQuery += ` AND b.status = $${countParamCount}`;
@@ -352,6 +583,8 @@ router.get('/', authenticateToken, async (req, res) => {
     });
   }
 });
+
+
 
 
 // UPDATE BRANCH (Admin/Manager only)
