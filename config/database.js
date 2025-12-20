@@ -472,6 +472,7 @@ const createTransactionTable = async () => {
           purpose VARCHAR(500),
           timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           type transaction_type NOT NULL,
+            created_by INTEGER, 
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           

@@ -59,6 +59,9 @@ const validateTransaction = (data, isUpdate = false) => {
 exports.createTransaction = async (req, res) => {
     try {
         const transactionData = req.body;
+        
+        // Get user ID from authentication middleware
+        const userId = req.user?.userId || req.user?.id || req.user?._id || 1;
 
         // Validate input
         const validationErrors = validateTransaction(transactionData);
@@ -70,13 +73,14 @@ exports.createTransaction = async (req, res) => {
             });
         }
 
-        // Format data
+        // Format data with created_by
         const formattedData = {
             from_person: transactionData.from_person.trim(),
             to_person: transactionData.to_person.trim(),
             amount: parseFloat(transactionData.amount),
             purpose: transactionData.purpose ? transactionData.purpose.trim() : null,
-            type: transactionData.type.toUpperCase()
+            type: transactionData.type.toUpperCase(),
+            created_by: userId
         };
 
         // Create transaction
@@ -85,7 +89,7 @@ exports.createTransaction = async (req, res) => {
         res.status(201).json({
             status: true,
             message: "Transaction created successfully",
-            data: transaction
+            data: transaction,
         });
 
     } catch (error) {
@@ -126,6 +130,9 @@ exports.getTransactions = async (req, res) => {
             sortBy = 'timestamp',
             sortOrder = 'DESC'
         } = req.query;
+        
+        // Get user ID from authentication middleware
+        const userId = req.user?.userId || req.user?.id || req.user?._id || 1;
 
         // Validate pagination parameters
         const pageNum = parseInt(page);
@@ -183,8 +190,9 @@ exports.getTransactions = async (req, res) => {
             });
         }
 
-        // Prepare filters
+        // Prepare filters WITH USER ID
         const filters = {
+            userId,
             search,
             type,
             fromPerson,
@@ -199,7 +207,7 @@ exports.getTransactions = async (req, res) => {
             limit: limitNum
         };
 
-        // ✅ CORRECT: Use the Transaction model's getAll method
+        // Get transactions for this user only
         const result = await Transaction.getAll(filters);
 
         res.status(200).json({
@@ -225,7 +233,9 @@ exports.getTransactions = async (req, res) => {
                 endDate: endDate || null,
                 sortBy,
                 sortOrder: sortOrder.toUpperCase()
-            }
+            },
+                        user:req.user.userId
+
         });
 
     } catch (error) {
@@ -242,6 +252,9 @@ exports.getTransactions = async (req, res) => {
 exports.getTransactionById = async (req, res) => {
     try {
         const transactionId = req.params.id;
+        
+        // Get user ID from authentication middleware
+        const userId = req.user?.userId || req.user?.id || req.user?._id || 1;
 
         if (!transactionId || isNaN(parseInt(transactionId))) {
             return res.status(400).json({
@@ -250,7 +263,8 @@ exports.getTransactionById = async (req, res) => {
             });
         }
 
-        const transaction = await Transaction.getById(transactionId);
+        // Get transaction for this user only
+        const transaction = await Transaction.getById(transactionId, userId);
 
         if (!transaction) {
             return res.status(404).json({
@@ -262,7 +276,9 @@ exports.getTransactionById = async (req, res) => {
         res.status(200).json({
             status: true,
             message: "Transaction fetched successfully",
-            data: transaction
+            data: transaction,
+                        user:req.user.userId
+
         });
 
     } catch (error) {
@@ -280,6 +296,9 @@ exports.updateTransaction = async (req, res) => {
     try {
         const transactionId = req.params.id;
         const updateData = req.body;
+        
+        // Get user ID from authentication middleware
+        const userId = req.user?.userId || req.user?.id || req.user?._id || 1;
 
         if (!transactionId || isNaN(parseInt(transactionId))) {
             return res.status(400).json({
@@ -288,8 +307,8 @@ exports.updateTransaction = async (req, res) => {
             });
         }
 
-        // Check if transaction exists
-        const existingTransaction = await Transaction.getById(transactionId);
+        // Check if transaction exists and belongs to user
+        const existingTransaction = await Transaction.getById(transactionId, userId);
         if (!existingTransaction) {
             return res.status(404).json({
                 status: false,
@@ -340,8 +359,8 @@ exports.updateTransaction = async (req, res) => {
             }
         }
 
-        // Update transaction
-        const updatedTransaction = await Transaction.update(transactionId, formattedData);
+        // Update transaction for this user only
+        const updatedTransaction = await Transaction.update(transactionId, formattedData, userId);
 
         if (!updatedTransaction) {
             return res.status(404).json({
@@ -353,7 +372,9 @@ exports.updateTransaction = async (req, res) => {
         res.status(200).json({
             status: true,
             message: "Transaction updated successfully",
-            data: updatedTransaction
+            data: updatedTransaction,
+                        user:req.user.userId
+
         });
 
     } catch (error) {
@@ -379,6 +400,9 @@ exports.updateTransaction = async (req, res) => {
 exports.deleteTransaction = async (req, res) => {
     try {
         const transactionId = req.params.id;
+        
+        // Get user ID from authentication middleware
+        const userId = req.user?.userId || req.user?.id || req.user?._id || 1;
 
         if (!transactionId || isNaN(parseInt(transactionId))) {
             return res.status(400).json({
@@ -387,7 +411,8 @@ exports.deleteTransaction = async (req, res) => {
             });
         }
 
-        const result = await Transaction.delete(transactionId);
+        // Delete transaction for this user only
+        const result = await Transaction.delete(transactionId, userId);
 
         if (!result) {
             return res.status(404).json({
@@ -399,7 +424,9 @@ exports.deleteTransaction = async (req, res) => {
         res.status(200).json({
             status: true,
             message: result.message,
-            data: result.transaction
+            data: result.transaction,
+                        user:req.user.userId
+
         });
 
     } catch (error) {
@@ -412,12 +439,13 @@ exports.deleteTransaction = async (req, res) => {
     }
 };
 
-
-
 // Get transactions summary/statistics
 exports.getTransactionsSummary = async (req, res) => {
     try {
         const { startDate, endDate } = req.query;
+        
+        // Get user ID from authentication middleware
+        const userId = req.user?.userId || req.user?.id || req.user?._id || 1;
 
         // Validate date formats if provided
         if (startDate && isNaN(Date.parse(startDate))) {
@@ -434,13 +462,20 @@ exports.getTransactionsSummary = async (req, res) => {
             });
         }
 
-        const filters = { startDate, endDate };
+        const filters = { 
+            userId,
+            startDate, 
+            endDate 
+        };
+        
         const summary = await Transaction.getSummary(filters);
 
         res.status(200).json({
             status: true,
             message: "Transactions summary fetched successfully",
-            data: summary
+            data: summary,
+         user:req.user.userId
+
         });
 
     } catch (error) {
@@ -457,6 +492,10 @@ exports.getTransactionsSummary = async (req, res) => {
 exports.getTransactionsByPerson = async (req, res) => {
     try {
         const personName = req.params.personName;
+        
+        // Get user ID from authentication middleware
+        const userId = req.user?.userId || req.user?.id || req.user?._id || 1;
+
         const {
             page = 1,
             limit = 20,
@@ -508,13 +547,24 @@ exports.getTransactionsByPerson = async (req, res) => {
             limit: limitNum
         };
 
-        // Note: You need to add getByPerson method to your model
-        // const result = await Transaction.getByPerson(personName, filters);
+        // Get transactions by person for this user only
+        const result = await Transaction.getByPerson(personName, filters, userId);
 
-        // For now, return a placeholder or implement the method
-        res.status(501).json({
-            status: false,
-            message: "getByPerson method not implemented yet"
+        res.status(200).json({
+            status: true,
+            message: "Transactions by person fetched successfully",
+            data: result.data,
+            pagination: {
+                page: pageNum,
+                limit: limitNum,
+                total: result.total,
+                totalPages: result.totalPages,
+                hasNextPage: pageNum < result.totalPages,
+                hasPrevPage: pageNum > 1
+            },
+            person: personName,
+                        user:req.user.userId
+
         });
 
     } catch (error) {
@@ -531,6 +581,9 @@ exports.getTransactionsByPerson = async (req, res) => {
 exports.getRecentTransactions = async (req, res) => {
     try {
         const limit = parseInt(req.query.limit) || 10;
+        
+        // Get user ID from authentication middleware
+        const userId = req.user?.userId || req.user?.id || req.user?._id || 1;
 
         if (isNaN(limit) || limit < 1 || limit > 50) {
             return res.status(400).json({
@@ -539,13 +592,15 @@ exports.getRecentTransactions = async (req, res) => {
             });
         }
 
-        // Note: You need to add getRecent method to your model
-        // const transactions = await Transaction.getRecent(limit);
+        const transactions = await Transaction.getRecent(limit, userId);
 
-        // For now, return a placeholder or implement the method
-        res.status(501).json({
-            status: false,
-            message: "getRecent method not implemented yet"
+        res.status(200).json({
+            status: true,
+            message: "Recent transactions fetched successfully",
+            data: transactions,
+            count: transactions.length,
+                        user:req.user.userId
+
         });
 
     } catch (error) {
@@ -562,6 +617,9 @@ exports.getRecentTransactions = async (req, res) => {
 exports.getTransactionsByDateRange = async (req, res) => {
     try {
         const { startDate, endDate, type, fromPerson, toPerson } = req.query;
+        
+        // Get user ID from authentication middleware
+        const userId = req.user?.userId || req.user?.id || req.user?._id || 1;
 
         // Validate required parameters
         if (!startDate || !endDate) {
@@ -596,14 +654,21 @@ exports.getTransactionsByDateRange = async (req, res) => {
             });
         }
 
-        // Note: You need to add getByDateRange method to your model
-        // const filters = { type, fromPerson, toPerson };
-        // const transactions = await Transaction.getByDateRange(startDate, endDate, filters);
+        const filters = { type, fromPerson, toPerson };
+        const transactions = await Transaction.getByDateRange(startDate, endDate, filters, userId);
 
-        // For now, return a placeholder or implement the method
-        res.status(501).json({
-            status: false,
-            message: "getByDateRange method not implemented yet"
+        res.status(200).json({
+            status: true,
+            message: "Transactions by date range fetched successfully",
+            data: transactions,
+            count: transactions.length,
+            dateRange: {
+                startDate: startDate,
+                endDate: endDate,
+                days: Math.ceil((end - start) / (1000 * 60 * 60 * 24))
+            },
+                        user:req.user.userId
+
         });
 
     } catch (error) {
@@ -615,3 +680,5 @@ exports.getTransactionsByDateRange = async (req, res) => {
         });
     }
 };
+
+

@@ -2,7 +2,16 @@ const express = require('express');
 const router = express.Router();
 const transactionController = require('../controller/transaction_controller');
 
-// ✅ FIXED: Summary route should come BEFORE parameterized routes
+
+const { authenticateToken, authorizeRoles } = require('../middleware/authMiddleware');
+
+
+
+
+// All routes require authentication
+router.use(authenticateToken);
+
+// ✅ FIXED: Summary route should comFORE parameterized routes
 // Get transactions summary/statistics
 router.get('/summary', transactionController.getTransactionsSummary);
 
