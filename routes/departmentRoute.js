@@ -63,7 +63,7 @@ router.post(
   async (req, res) => {
     try {
       console.log('📝 Creating department:', req.body);
-
+ const createdBy = req.user?.userId;
       // Check if head is already assigned to another department
       const headCheck = await pool.query(
         'SELECT COUNT(*) FROM departments WHERE head_id = $1',
@@ -135,6 +135,211 @@ router.post(
 
 
 
+// router.get('/', authenticateToken, async (req, res) => {
+//   try {
+//     const {
+//       branchId,
+//       // activeOnly = 'true',
+//       type,
+//       search,
+//       page = 1,
+//       limit = 20,
+//       sortBy = 'name',
+//       sortOrder = 'ASC'
+//     } = req.query;
+
+    
+//     const createdBy= req.user.userId;
+    
+//     let query = `
+//       SELECT 
+//         d.*,
+//         b.name as branch_name,
+//         b.code as branch_code,
+//         u.name as head_name
+//       FROM departments d
+//       LEFT JOIN branches b ON d.branch_id = b.id
+//       LEFT JOIN users u ON d.head_id = u.id::VARCHAR
+//       WHERE 1=1
+//     `;
+    
+//     const params = [];
+//     let paramCount = 1;
+
+//     // Apply filters
+//     if (branchId) {
+//       query += ` AND d.branch_id = $${paramCount}`;
+//       params.push(parseInt(branchId));
+//       paramCount++;
+//     }
+
+//     // Only filter by is_active when activeOnly is 'true'
+//   // To show only INACTIVE departments when activeOnly='false'
+// // if (activeOnly === 'true') {
+// //   query += ` AND d.is_active = $${paramCount}`;
+// //   params.push(true);
+// //   paramCount++;
+// // } else if (activeOnly === 'false') {
+// //   query += ` AND d.is_active = $${paramCount}`;
+// //   params.push(false);
+// //   paramCount++;
+
+// // }
+
+
+//     if (type && type.trim() !== '') {
+//       query += ` AND d.type ILIKE $${paramCount}`;
+//       params.push(`%${type.trim()}%`);
+//       paramCount++;
+//     }
+
+//     if (search && search.trim() !== '') {
+//       const searchTerm = `%${search.trim()}%`;
+//       query += ` AND (
+//         d.name ILIKE $${paramCount} OR 
+//         d.type ILIKE $${paramCount} OR 
+//         COALESCE(d.description, '') ILIKE $${paramCount} OR
+//         COALESCE(d.contact_email, '') ILIKE $${paramCount} OR
+//         COALESCE(d.contact_phone, '') ILIKE $${paramCount} OR
+//         COALESCE(d.location, '') ILIKE $${paramCount} OR
+//         b.name ILIKE $${paramCount}
+//       )`;
+//       params.push(searchTerm);
+//       paramCount++;
+//     }
+
+//     // Validate sort column
+//     const validSortColumns = ['id', 'name', 'type', 'staff_count', 'budget', 'created_at', 'updated_at', 'branch_name'];
+//     const sortColumn = validSortColumns.includes(sortBy) ? 
+//       (sortBy === 'branch_name' ? 'b.name' : `d.${sortBy}`) : 
+//       'd.name';
+    
+//     const order = sortOrder.toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
+//     query += ` ORDER BY ${sortColumn} ${order}`;
+
+//     // Get total count
+//     let countQuery = `
+//       SELECT COUNT(*) as total
+//       FROM departments d
+//       LEFT JOIN branches b ON d.branch_id = b.id
+//       LEFT JOIN users u ON d.head_id = u.id::VARCHAR
+//       WHERE 1=1
+//     `;
+    
+//     // Apply the same filters to count query using the same params
+//     const countParams = [];
+//     let countParamCount = 1;
+
+//     if (branchId) {
+//       countQuery += ` AND d.branch_id = $${countParamCount}`;
+//       countParams.push(parseInt(branchId));
+//       countParamCount++;
+//     }
+
+
+
+
+//     // if (activeOnly === 'true') {
+//     //   countQuery += ` AND d.is_active = $${countParamCount}`;
+//     //   countParams.push(true);
+//     //   countParamCount++;
+//     // }
+//     //   else if (activeOnly === 'false') {
+//     //   countQuery += ` AND d.is_active = $${countParamCount}`;
+//     //   countParams.push(false);
+//     //   countParamCount++;
+//     // }
+
+
+//     if (type && type.trim() !== '') {
+//       countQuery += ` AND d.type ILIKE $${countParamCount}`;
+//       countParams.push(`%${type.trim()}%`);
+//       countParamCount++;
+//     }
+
+//     if (search && search.trim() !== '') {
+//       const searchTerm = `%${search.trim()}%`;
+//       countQuery += ` AND (
+//         d.name ILIKE $${countParamCount} OR 
+//         d.type ILIKE $${countParamCount} OR 
+//         COALESCE(d.description, '') ILIKE $${countParamCount} OR
+//         COALESCE(d.contact_email, '') ILIKE $${countParamCount} OR
+//         COALESCE(d.contact_phone, '') ILIKE $${countParamCount} OR
+//         COALESCE(d.location, '') ILIKE $${countParamCount} OR
+//         b.name ILIKE $${countParamCount}
+//       )`;
+//       countParams.push(searchTerm);
+//       countParamCount++;
+//     }
+
+//     // Get count
+//     const countResult = await pool.query(countQuery, countParams);
+//     const total = parseInt(countResult.rows[0]?.total || 0);
+
+//     // Calculate pagination
+//     const pageNum = Math.max(1, parseInt(page));
+//     const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
+//     const offset = (pageNum - 1) * limitNum;
+    
+//     // Add pagination to main query
+//     query += ` LIMIT $${paramCount} OFFSET $${paramCount + 1}`;
+//     params.push(limitNum);
+//     params.push(offset);
+
+//     const result = await pool.query(query, params);
+
+//     res.json({
+//       success: true,
+//       data: result.rows.map(row => ({
+//         id: row.id,
+//         branch_id: row.branch_id,
+//         type: row.type,
+//         name: row.name,
+//         head_id: row.head_id,
+//         staff_count: row.staff_count,
+//         is_active: row.is_active,
+//         description: row.description,
+//         contact_email: row.contact_email,
+//         contact_phone: row.contact_phone,
+//         location: row.location,
+//         budget: row.budget,
+//         created_by: row.created_by,
+//         created_at: row.created_at,
+//         updated_at: row.updated_at,
+//         branch_name: row.branch_name
+//         // Removed branch_code and head_name as per your expected response
+//       })),
+//       pagination: {
+//         total,
+//         page: pageNum,
+//         limit: limitNum,
+//         totalPages: Math.ceil(total / limitNum),
+//         hasMore: pageNum < Math.ceil(total / limitNum)
+//       },
+//       filters: {
+//         search: search || null,
+//         type: type || null,
+//         // activeOnly: activeOnly,
+//         sortBy,
+//         sortOrder: order.toLowerCase()
+//       }
+//     });
+//   } catch (error) {
+//     console.error('Get departments error:', error);
+//     res.status(500).json({
+//       success: false,
+//       error: 'Failed to fetch departments'
+//     });
+//   }
+// });
+
+
+
+// GET DEPARTMENT BY ID
+
+
+
+
 router.get('/', authenticateToken, async (req, res) => {
   try {
     const {
@@ -148,6 +353,8 @@ router.get('/', authenticateToken, async (req, res) => {
       sortOrder = 'ASC'
     } = req.query;
 
+    // Get the logged-in user's ID
+    const createdBy = req.user.userId;
     
     let query = `
       SELECT 
@@ -171,18 +378,22 @@ router.get('/', authenticateToken, async (req, res) => {
       paramCount++;
     }
 
-    // Only filter by is_active when activeOnly is 'true'
-  // To show only INACTIVE departments when activeOnly='false'
-// if (activeOnly === 'true') {
-//   query += ` AND d.is_active = $${paramCount}`;
-//   params.push(true);
-//   paramCount++;
-// } else if (activeOnly === 'false') {
-//   query += ` AND d.is_active = $${paramCount}`;
-//   params.push(false);
-//   paramCount++;
+    // ADD THIS: Filter by created_by (logged-in user)
+    query += ` AND d.created_by = $${paramCount}`;
+    params.push(createdBy);
+    paramCount++;
 
-// }
+    // Only filter by is_active when activeOnly is 'true'
+    // To show only INACTIVE departments when activeOnly='false'
+    // if (activeOnly === 'true') {
+    //   query += ` AND d.is_active = $${paramCount}`;
+    //   params.push(true);
+    //   paramCount++;
+    // } else if (activeOnly === 'false') {
+    //   query += ` AND d.is_active = $${paramCount}`;
+    //   params.push(false);
+    //   paramCount++;
+    // }
 
     if (type && type.trim() !== '') {
       query += ` AND d.type ILIKE $${paramCount}`;
@@ -233,20 +444,20 @@ router.get('/', authenticateToken, async (req, res) => {
       countParamCount++;
     }
 
-
-
+    // ADD THIS: Filter by created_by in count query too
+    countQuery += ` AND d.created_by = $${countParamCount}`;
+    countParams.push(createdBy);
+    countParamCount++;
 
     // if (activeOnly === 'true') {
     //   countQuery += ` AND d.is_active = $${countParamCount}`;
     //   countParams.push(true);
     //   countParamCount++;
-    // }
-    //   else if (activeOnly === 'false') {
+    // } else if (activeOnly === 'false') {
     //   countQuery += ` AND d.is_active = $${countParamCount}`;
     //   countParams.push(false);
     //   countParamCount++;
     // }
-
 
     if (type && type.trim() !== '') {
       countQuery += ` AND d.type ILIKE $${countParamCount}`;
@@ -332,7 +543,6 @@ router.get('/', authenticateToken, async (req, res) => {
 
 
 
-// GET DEPARTMENT BY ID
 router.get('/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
@@ -377,6 +587,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
   }
 });
 
+
 // GET DEPARTMENTS BY BRANCH ID with advanced search and filters
 router.get('/branch/:branchId', authenticateToken, async (req, res) => {
   try {
@@ -391,15 +602,18 @@ router.get('/branch/:branchId', authenticateToken, async (req, res) => {
       sortOrder = 'ASC'
     } = req.query;
     
+    // Get the logged-in user's ID from JWT token
+    const createdBy = req.user.userId;
+    
     // Parse pagination parameters
     const pageNum = Math.max(1, parseInt(page));
     const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
     const offset = (pageNum - 1) * limitNum;
 
-    // Build query conditions
-    let whereClause = 'WHERE d.branch_id = $1';
-    const params = [parseInt(branchId)];
-    let paramCount = 2;
+    // Build query conditions - ADDED created_by filter
+    let whereClause = 'WHERE d.branch_id = $1 AND d.created_by = $2';
+    const params = [parseInt(branchId), createdBy];
+    let paramCount = 3; // Start from 3 because we already have 2 params
 
     // Add search condition
     if (search && search.trim() !== '') {
@@ -428,15 +642,11 @@ router.get('/branch/:branchId', authenticateToken, async (req, res) => {
       whereClause += ` AND d.is_active = $${paramCount}`;
       params.push(true);
       paramCount++;
-    }
-
-    else if (activeOnly === 'false') {
+    } else if (activeOnly === 'false') {
       whereClause += ` AND d.is_active = $${paramCount}`;
       params.push(false);
       paramCount++;
     }
-
-
 
     // Validate and set sort column
     const validSortColumns = ['name', 'type', 'created_at', 'staff_count', 'budget', 'is_active'];
@@ -510,6 +720,10 @@ router.get('/branch/:branchId', authenticateToken, async (req, res) => {
     });
   }
 });
+
+
+
+
 
 // UPDATE DEPARTMENT (Admin/Manager only)
 router.put(

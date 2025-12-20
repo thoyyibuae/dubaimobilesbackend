@@ -1,5 +1,6 @@
 const pool = require('../config/database');
 
+
 class Department {
   // CREATE DEPARTMENT
   static async create(departmentData) {
@@ -23,7 +24,7 @@ class Department {
     departmentData.contactPhone || null,
     departmentData.location || null,
     departmentData.budget || 0.00,
-    // departmentData.createdBy  // This comes from JWT, not request body
+    departmentData.createdBy  // This comes from JWT, not request body
   ];
   
   const result = await pool.query(query, values);
@@ -58,7 +59,7 @@ class Department {
   }
 
   // FIND ALL WITH FILTERS
-  static async findAll(options = {}) {
+static async findAll(options = {}) {
     let query = 'SELECT * FROM departments WHERE 1=1';
     const params = [];
     let paramCount = 1;
@@ -87,6 +88,13 @@ class Department {
       paramCount++;
     }
     
+    // Filter by created_by only if provided AND user is not admin
+    if (options.createdBy && !options.isAdmin) {
+      query += ` AND created_by = $${paramCount}`;
+      params.push(options.createdBy);
+      paramCount++;
+    }
+    
     query += ' ORDER BY name';
     
     if (options.limit) {
@@ -103,6 +111,7 @@ class Department {
     const result = await pool.query(query, params);
     return result.rows;
   }
+  
 
   // GET TOTAL COUNT FOR PAGINATION
   static async getTotalCount(options = {}) {
