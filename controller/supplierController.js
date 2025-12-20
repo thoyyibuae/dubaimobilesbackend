@@ -8,6 +8,7 @@ class SupplierController {
     static async createSupplier(req, res) {
         try {
             const { name, address, phone_number } = req.body;
+            const createdBy = req.user.userId;
             
             // Validation
             if (!name || name.trim() === '') {
@@ -27,9 +28,10 @@ class SupplierController {
             const supplierData = {
                 name: name.trim(),
                 address: address ? address.trim() : null,
-                phone_number: phone_number ? phone_number.trim() : null
+                phone_number: phone_number ? phone_number.trim() : null,
+                created_by: createdBy
             };
-
+            
             const supplier = await Supplier.create(supplierData);
 
             res.status(201).json({
@@ -102,13 +104,17 @@ class SupplierController {
                 });
             }
 
+            // Get logged-in user ID
+            const userId = req.user.userId;
+
             const filters = {
                 page,
                 limit,
                 sortBy,
                 sortOrder: sortOrder.toUpperCase(),
                 search,
-                phoneNumber
+                phoneNumber,
+                createdBy: userId // ALWAYS pass createdBy for filtering
             };
 
             const result = await Supplier.findAllWithFilters(filters);
@@ -116,7 +122,11 @@ class SupplierController {
             res.json({
                 success: true,
                 message: 'Suppliers retrieved successfully',
-                ...result
+                ...result,
+                user: {
+                    id: userId,
+                    createdBy: userId
+                }
             });
         } catch (error) {
             console.error('Error fetching suppliers:', error);
@@ -143,7 +153,10 @@ class SupplierController {
                 });
             }
 
-            const supplier = await Supplier.findById(parseInt(id));
+            // Get logged-in user ID
+            const userId = req.user.userId;
+
+            const supplier = await Supplier.findById(parseInt(id), userId);
 
             if (!supplier) {
                 return res.status(404).json({
@@ -183,12 +196,15 @@ class SupplierController {
                 });
             }
 
-            // Check if supplier exists
-            const existingSupplier = await Supplier.findById(parseInt(id));
+            // Get logged-in user ID
+            const userId = req.user.userId;
+
+            // Check if supplier exists and belongs to user
+            const existingSupplier = await Supplier.findById(parseInt(id), userId);
             if (!existingSupplier) {
                 return res.status(404).json({
                     success: false,
-                    error: 'Supplier not found'
+                    error: 'Supplier not found or you do not have permission to update it'
                 });
             }
 
@@ -254,12 +270,15 @@ class SupplierController {
                 });
             }
 
-            // Check if supplier exists
-            const existingSupplier = await Supplier.findById(parseInt(id));
+            // Get logged-in user ID
+            const userId = req.user.userId;
+
+            // Check if supplier exists and belongs to user
+            const existingSupplier = await Supplier.findById(parseInt(id), userId);
             if (!existingSupplier) {
                 return res.status(404).json({
                     success: false,
-                    error: 'Supplier not found'
+                    error: 'Supplier not found or you do not have permission to update it'
                 });
             }
 
@@ -335,6 +354,18 @@ class SupplierController {
                 });
             }
 
+            // Get logged-in user ID
+            const userId = req.user.userId;
+
+            // Check if supplier exists and belongs to user before deleting
+            const existingSupplier = await Supplier.findById(parseInt(id), userId);
+            if (!existingSupplier) {
+                return res.status(404).json({
+                    success: false,
+                    error: 'Supplier not found or you do not have permission to delete it'
+                });
+            }
+
             const deletedSupplier = await Supplier.delete(parseInt(id));
             
             if (!deletedSupplier) {
@@ -373,6 +404,9 @@ class SupplierController {
                 });
             }
 
+            // Get logged-in user ID
+            const userId = req.user.userId;
+
             const pageNum = Math.max(1, parseInt(page));
             const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
 
@@ -391,7 +425,7 @@ class SupplierController {
                 });
             }
 
-            const result = await Supplier.searchByName(name.trim(), pageNum, limitNum);
+            const result = await Supplier.searchByName(name.trim(), pageNum, limitNum, userId);
             
             res.json({
                 success: true,
@@ -414,13 +448,20 @@ class SupplierController {
      */
     static async getSuppliersCount(req, res) {
         try {
-            const count = await Supplier.getCount();
+            // Get logged-in user ID
+            const userId = req.user.userId;
+
+            const count = await Supplier.getCount(userId);
             
             res.json({
                 success: true,
                 message: 'Total count retrieved successfully',
                 data: {
                     totalSuppliers: count
+                },
+                user: {
+                    id: userId,
+                    createdBy: userId
                 }
             });
         } catch (error) {
@@ -440,24 +481,31 @@ class SupplierController {
         try {
             const { format = 'json', page = 1, limit = 1000 } = req.query;
             
+            // Get logged-in user ID
+            const userId = req.user.userId;
+
             const pageNum = Math.max(1, parseInt(page));
             const limitNum = Math.min(5000, Math.max(1, parseInt(limit)));
 
-            const result = await Supplier.findAllWithFilters({
+            const filters = {
                 page: pageNum,
                 limit: limitNum,
                 sortBy: 'id',
-                sortOrder: 'ASC'
-            });
+                sortOrder: 'ASC',
+                createdBy: userId // ALWAYS pass createdBy
+            };
+
+            const result = await Supplier.findAllWithFilters(filters);
 
             if (format.toLowerCase() === 'csv') {
                 // Convert to CSV
-                const headers = ['ID', 'Name', 'Address', 'Phone Number', 'Created At', 'Updated At'];
+                const headers = ['ID', 'Name', 'Address', 'Phone Number', 'Created By', 'Created At', 'Updated At'];
                 const rows = result.data.map(supplier => [
                     supplier.id,
                     `"${supplier.name.replace(/"/g, '""')}"`,
                     `"${(supplier.address || '').replace(/"/g, '""')}"`,
                     supplier.phone_number || '',
+                    supplier.created_by || 'N/A',
                     supplier.created_at,
                     supplier.updated_at
                 ]);
@@ -489,5 +537,6 @@ class SupplierController {
         }
     }
 }
+
 
 module.exports = SupplierController;

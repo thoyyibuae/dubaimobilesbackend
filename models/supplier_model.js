@@ -4,17 +4,20 @@ class Supplier {
     /**
      * Create a new supplier
      */
+    
     static async create(supplierData) {
-        const { name, address, phone_number } = supplierData;
+        const { name, address, phone_number, created_by } = supplierData;
         const query = `
-            INSERT INTO suppliers (name, address, phone_number)
-            VALUES ($1, $2, $3)
+            INSERT INTO suppliers (name, address, phone_number, created_by)
+            VALUES ($1, $2, $3, $4)
             RETURNING *
         `;
-        const values = [name, address, phone_number];
+        const values = [name, address, phone_number, created_by];
         const result = await pool.query(query, values);
         return result.rows[0];
     }
+
+
 
     /**
      * Find all suppliers with pagination and filters
@@ -26,7 +29,8 @@ class Supplier {
             sortBy = 'created_at',
             sortOrder = 'DESC',
             search = '',
-            phoneNumber = ''
+            phoneNumber = '',
+            createdBy = null
         } = filters;
 
         const offset = (page - 1) * limit;
@@ -35,6 +39,13 @@ class Supplier {
         const whereConditions = [];
         const queryParams = [];
         let paramCount = 1;
+
+        // Always add created_by filter if provided
+        if (createdBy !== null) {
+            whereConditions.push(`created_by = $${paramCount}`);
+            queryParams.push(createdBy);
+            paramCount++;
+        }
 
         if (search) {
             whereConditions.push(`(name ILIKE $${paramCount} OR address ILIKE $${paramCount})`);
@@ -53,7 +64,7 @@ class Supplier {
             : '';
 
         // Validate sortBy to prevent SQL injection
-        const validSortColumns = ['id', 'name', 'address', 'phone_number', 'created_at', 'updated_at'];
+        const validSortColumns = ['id', 'name', 'address', 'phone_number', 'created_at', 'updated_at', 'created_by'];
         const safeSortBy = validSortColumns.includes(sortBy) ? sortBy : 'created_at';
         const safeSortOrder = sortOrder.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
 
@@ -65,13 +76,14 @@ class Supplier {
         const countResult = await pool.query(countQuery, queryParams);
         const totalCount = parseInt(countResult.rows[0].count);
 
-        // Get paginated data
+        // Get paginated data - include created_by in SELECT
         const dataQuery = `
             SELECT 
                 id,
                 name,
                 address,
                 phone_number,
+                created_by,
                 created_at,
                 updated_at
             FROM suppliers 
@@ -101,7 +113,8 @@ class Supplier {
                 search,
                 phoneNumber,
                 sortBy: safeSortBy,
-                sortOrder: safeSortOrder
+                sortOrder: safeSortOrder,
+                createdBy: createdBy
             }
         };
     }
@@ -109,19 +122,29 @@ class Supplier {
     /**
      * Find supplier by ID
      */
-    static async findById(id) {
-        const query = `
+    static async findById(id, userId = null) {
+        let query = `
             SELECT 
                 id,
                 name,
                 address,
                 phone_number,
+                created_by,
                 created_at,
                 updated_at
             FROM suppliers 
             WHERE id = $1
         `;
-        const result = await pool.query(query, [id]);
+        
+        const queryParams = [id];
+        
+        // Always add created_by filter if userId is provided
+        if (userId !== null) {
+            query += ` AND created_by = $2`;
+            queryParams.push(userId);
+        }
+        
+        const result = await pool.query(query, queryParams);
         return result.rows[0];
     }
 
@@ -189,12 +212,24 @@ class Supplier {
     /**
      * Search suppliers by name with pagination
      */
-    static async searchByName(name, page = 1, limit = 10) {
+    static async searchByName(name, page = 1, limit = 10, userId = null) {
         const offset = (page - 1) * limit;
         
+        // Build WHERE clause
+        let whereClause = 'WHERE name ILIKE $1';
+        const queryParams = [`%${name}%`];
+        let paramCount = 2;
+        
+        // Always add created_by filter if userId is provided
+        if (userId !== null) {
+            whereClause += ` AND created_by = $${paramCount}`;
+            queryParams.push(userId);
+            paramCount++;
+        }
+        
         // Get total count for search
-        const countQuery = 'SELECT COUNT(*) FROM suppliers WHERE name ILIKE $1';
-        const countResult = await pool.query(countQuery, [`%${name}%`]);
+        const countQuery = `SELECT COUNT(*) FROM suppliers ${whereClause}`;
+        const countResult = await pool.query(countQuery, queryParams);
         const totalCount = parseInt(countResult.rows[0].count);
         
         // Get paginated search results
@@ -204,14 +239,17 @@ class Supplier {
                 name,
                 address,
                 phone_number,
+                created_by,
                 created_at,
                 updated_at
             FROM suppliers 
-            WHERE name ILIKE $1 
+            ${whereClause}
             ORDER BY name 
-            LIMIT $2 OFFSET $3
+            LIMIT $${paramCount} OFFSET $${paramCount + 1}
         `;
-        const dataResult = await pool.query(dataQuery, [`%${name}%`, limit, offset]);
+        
+        const dataParams = [...queryParams, limit, offset];
+        const dataResult = await pool.query(dataQuery, dataParams);
         
         const totalPages = Math.ceil(totalCount / limit);
         
@@ -226,6 +264,10 @@ class Supplier {
                 hasPreviousPage: page > 1,
                 nextPage: page < totalPages ? page + 1 : null,
                 previousPage: page > 1 ? page - 1 : null
+            },
+            filters: {
+                searchName: name,
+                createdBy: userId
             }
         };
     }
@@ -233,31 +275,55 @@ class Supplier {
     /**
      * Get total count of suppliers
      */
-    static async getCount() {
-        const query = 'SELECT COUNT(*) FROM suppliers';
-        const result = await pool.query(query);
+    static async getCount(userId = null) {
+        let query = 'SELECT COUNT(*) FROM suppliers';
+        const queryParams = [];
+        
+        // Always add created_by filter if userId is provided
+        if (userId !== null) {
+            query += ' WHERE created_by = $1';
+            queryParams.push(userId);
+        }
+        
+        const result = await pool.query(query, queryParams);
         return parseInt(result.rows[0].count);
     }
 
     /**
      * Find suppliers by phone number
      */
-    static async findByPhoneNumber(phoneNumber) {
-        const query = 'SELECT * FROM suppliers WHERE phone_number = $1';
-        const result = await pool.query(query, [phoneNumber]);
+    static async findByPhoneNumber(phoneNumber, userId = null) {
+        let query = 'SELECT * FROM suppliers WHERE phone_number = $1';
+        const queryParams = [phoneNumber];
+        
+        // Always add created_by filter if userId is provided
+        if (userId !== null) {
+            query += ' AND created_by = $2';
+            queryParams.push(userId);
+        }
+        
+        const result = await pool.query(query, queryParams);
         return result.rows;
     }
 
     /**
      * Check if supplier name exists
      */
-    static async nameExists(name, excludeId = null) {
+    static async nameExists(name, excludeId = null, userId = null) {
         let query = 'SELECT id FROM suppliers WHERE name = $1';
         const params = [name];
+        let paramCount = 2;
         
         if (excludeId) {
-            query += ' AND id != $2';
+            query += ` AND id != $${paramCount}`;
             params.push(excludeId);
+            paramCount++;
+        }
+        
+        // Always add created_by filter if userId is provided
+        if (userId !== null) {
+            query += ` AND created_by = $${paramCount}`;
+            params.push(userId);
         }
         
         const result = await pool.query(query, params);
@@ -267,23 +333,37 @@ class Supplier {
     /**
      * Get suppliers created within a date range
      */
-    static async getByDateRange(startDate, endDate, page = 1, limit = 10) {
+    static async getByDateRange(startDate, endDate, page = 1, limit = 10, userId = null) {
         const offset = (page - 1) * limit;
+        
+        // Build WHERE clause
+        let whereClause = 'WHERE created_at BETWEEN $1 AND $2';
+        const queryParams = [startDate, endDate];
+        let paramCount = 3;
+        
+        // Always add created_by filter if userId is provided
+        if (userId !== null) {
+            whereClause += ` AND created_by = $${paramCount}`;
+            queryParams.push(userId);
+            paramCount++;
+        }
         
         const countQuery = `
             SELECT COUNT(*) FROM suppliers 
-            WHERE created_at BETWEEN $1 AND $2
+            ${whereClause}
         `;
-        const countResult = await pool.query(countQuery, [startDate, endDate]);
+        const countResult = await pool.query(countQuery, queryParams);
         const totalCount = parseInt(countResult.rows[0].count);
         
         const dataQuery = `
             SELECT * FROM suppliers 
-            WHERE created_at BETWEEN $1 AND $2
+            ${whereClause}
             ORDER BY created_at DESC
-            LIMIT $3 OFFSET $4
+            LIMIT $${paramCount} OFFSET $${paramCount + 1}
         `;
-        const dataResult = await pool.query(dataQuery, [startDate, endDate, limit, offset]);
+        
+        const dataParams = [...queryParams, limit, offset];
+        const dataResult = await pool.query(dataQuery, dataParams);
         
         const totalPages = Math.ceil(totalCount / limit);
         
@@ -298,5 +378,6 @@ class Supplier {
         };
     }
 }
+
 
 module.exports = Supplier;
