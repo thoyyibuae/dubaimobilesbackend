@@ -6,13 +6,14 @@ class CategoryController {
   static async createCategory(req, res) {
     try {
       const { name, description } = req.body;
+      const userId = req.user.userId; // Get user ID from authentication
       
       if (!name) {
         return res.status(400).json({ error: 'Category name is required' });
       }
 
-      // Check if category already exists
-      const categoryExists = await Category.existsByName(name);
+      // Check if category already exists for this user
+      const categoryExists = await Category.existsByName(name, null, userId);
       if (categoryExists) {
         return res.status(400).json({ error: 'Category with this name already exists' });
       }
@@ -21,7 +22,7 @@ class CategoryController {
       const iconImage = req.file ? req.file.filename : null;
 
       // Create category
-      const category = await Category.create(name, description, iconImage);
+      const category = await Category.create(name, description, iconImage, userId);
 
       // Generate file URL if icon exists
       if (iconImage) {
@@ -38,10 +39,11 @@ class CategoryController {
     }
   }
 
-  // Get all categories
+  // Get all categories for logged-in user
   static async getAllCategories(req, res) {
     try {
-      const categories = await Category.findAll();
+      const userId = req.user.userId; // Get user ID from authentication
+      const categories = await Category.findAll(userId);
       
       // Add full URLs to icon images
       const categoriesWithUrls = categories.map(category => ({
@@ -52,7 +54,11 @@ class CategoryController {
 
       res.json({
         count: categoriesWithUrls.length,
-        categories: categoriesWithUrls
+        categories: categoriesWithUrls,
+        user: {
+          id: userId,
+          created_by: userId
+        }
       });
     } catch (error) {
       console.error('Get categories error:', error);
@@ -60,11 +66,54 @@ class CategoryController {
     }
   }
 
-  // Get single category
+  // Get all categories with pagination for logged-in user
+  static async getAllCategoriesPaginated(req, res) {
+    try {
+      const userId = req.user.userId;
+      const page = parseInt(req.query.page) || 1;
+      const limit = parseInt(req.query.limit) || 10;
+      const search = req.query.search || '';
+
+      const result = await Category.findAllPaginated(userId, page, limit, search);
+      
+      // Add full URLs to icon images
+      const categoriesWithUrls = result.data.map(category => ({
+        ...category,
+        icon_url: category.icon_image ? 
+          FileHandler.getFileUrl(req, category.icon_image, 'categories') : null
+      }));
+
+      res.json({
+        success: true,
+        message: 'Categories retrieved successfully',
+        data: categoriesWithUrls,
+        pagination: result.pagination,
+        filters: {
+          search,
+          page,
+          limit
+        },
+        user: {
+          id: userId,
+          created_by: userId
+        }
+      });
+    } catch (error) {
+      console.error('Get paginated categories error:', error);
+      res.status(500).json({ 
+        success: false,
+        error: 'Failed to fetch categories' 
+      });
+    }
+  }
+
+  // Get single category for logged-in user
   static async getCategory(req, res) {
     try {
       const { id } = req.params;
-      const category = await Category.findById(id);
+      const userId = req.user.userId; // Get user ID from authentication
+      
+      const category = await Category.findById(id, userId);
 
       if (!category) {
         return res.status(404).json({ error: 'Category not found' });
@@ -74,28 +123,40 @@ class CategoryController {
       category.icon_url = category.icon_image ? 
         FileHandler.getFileUrl(req, category.icon_image, 'categories') : null;
 
-      res.json(category);
+      res.json({
+        success: true,
+        message: 'Category retrieved successfully',
+        data: category,
+        user: {
+          id: userId,
+          created_by: userId
+        }
+      });
     } catch (error) {
       console.error('Get category error:', error);
-      res.status(500).json({ error: 'Failed to fetch category' });
+      res.status(500).json({ 
+        success: false,
+        error: 'Failed to fetch category' 
+      });
     }
   }
 
-  // Update category
+  // Update category for logged-in user
   static async updateCategory(req, res) {
     try {
       const { id } = req.params;
       const { name, description } = req.body;
+      const userId = req.user.userId; // Get user ID from authentication
 
-      // Check if category exists
-      const existingCategory = await Category.findById(id);
+      // Check if category exists and belongs to user
+      const existingCategory = await Category.findById(id, userId);
       if (!existingCategory) {
         return res.status(404).json({ error: 'Category not found' });
       }
 
-      // Check if new name already exists (excluding current category)
+      // Check if new name already exists for this user (excluding current category)
       if (name && name !== existingCategory.name) {
-        const nameExists = await Category.existsByName(name, id);
+        const nameExists = await Category.existsByName(name, id, userId);
         if (nameExists) {
           return res.status(400).json({ error: 'Category with this name already exists' });
         }
@@ -116,7 +177,8 @@ class CategoryController {
         id, 
         name || existingCategory.name, 
         description || existingCategory.description, 
-        iconImage
+        iconImage,
+        userId
       );
 
       // Add full URL to icon image
@@ -125,7 +187,11 @@ class CategoryController {
 
       res.json({
         message: 'Category updated successfully',
-        category: updatedCategory
+        category: updatedCategory,
+        user: {
+          id: userId,
+          created_by: userId
+        }
       });
     } catch (error) {
       console.error('Update category error:', error);
@@ -133,32 +199,140 @@ class CategoryController {
     }
   }
 
-  // Delete category
+  // Delete category for logged-in user
   static async deleteCategory(req, res) {
     try {
       const { id } = req.params;
+      const userId = req.user.userId; // Get user ID from authentication
 
-      // Get category before deletion to get icon filename
-      const existingCategory = await Category.findById(id);
+      // Get category before deletion to check ownership and get icon filename
+      const existingCategory = await Category.findById(id, userId);
       if (!existingCategory) {
         return res.status(404).json({ error: 'Category not found' });
       }
 
       // Delete category from database
-      const deletedCategory = await Category.delete(id);
+      const deletedCategory = await Category.delete(id, userId);
 
       // Delete associated file
-      if (deletedCategory.icon_image) {
+      if (deletedCategory && deletedCategory.icon_image) {
         await FileHandler.deleteFile(`uploads/categories/${deletedCategory.icon_image}`);
       }
 
       res.json({
         message: 'Category deleted successfully',
-        categoryId: deletedCategory.id
+        categoryId: deletedCategory ? deletedCategory.id : id,
+        user: {
+          id: userId,
+          created_by: userId
+        }
       });
     } catch (error) {
       console.error('Delete category error:', error);
       res.status(500).json({ error: 'Failed to delete category' });
+    }
+  }
+
+  // Search categories by name for logged-in user
+  static async searchCategories(req, res) {
+    try {
+      const { name } = req.query;
+      const userId = req.user.userId;
+      
+      if (!name || name.trim() === '') {
+        return res.status(400).json({ 
+          success: false,
+          error: 'Search query is required' 
+        });
+      }
+
+      const page = parseInt(req.query.page) || 1;
+      const limit = parseInt(req.query.limit) || 10;
+
+      const result = await Category.searchByName(name.trim(), userId, page, limit);
+      
+      // Add full URLs to icon images
+      const categoriesWithUrls = result.data.map(category => ({
+        ...category,
+        icon_url: category.icon_image ? 
+          FileHandler.getFileUrl(req, category.icon_image, 'categories') : null
+      }));
+
+      res.json({
+        success: true,
+        message: 'Search completed successfully',
+        searchQuery: name,
+        data: categoriesWithUrls,
+        pagination: result.pagination,
+        user: {
+          id: userId,
+          created_by: userId
+        }
+      });
+    } catch (error) {
+      console.error('Search categories error:', error);
+      res.status(500).json({ 
+        success: false,
+        error: 'Failed to search categories' 
+      });
+    }
+  }
+
+  // Get total count of categories for logged-in user
+  static async getCategoriesCount(req, res) {
+    try {
+      const userId = req.user.userId;
+      const count = await Category.getCount(userId);
+      
+      res.json({
+        success: true,
+        message: 'Total count retrieved successfully',
+        data: {
+          totalCategories: count
+        },
+        user: {
+          id: userId,
+          created_by: userId
+        }
+      });
+    } catch (error) {
+      console.error('Get categories count error:', error);
+      res.status(500).json({ 
+        success: false,
+        error: 'Failed to get categories count' 
+      });
+    }
+  }
+
+  // Get categories created by current user (alias for getAllCategories)
+  static async getMyCategories(req, res) {
+    try {
+      const userId = req.user.userId;
+      const categories = await Category.getByCreatedBy(userId);
+      
+      // Add full URLs to icon images
+      const categoriesWithUrls = categories.map(category => ({
+        ...category,
+        icon_url: category.icon_image ? 
+          FileHandler.getFileUrl(req, category.icon_image, 'categories') : null
+      }));
+
+      res.json({
+        success: true,
+        message: 'My categories retrieved successfully',
+        data: categoriesWithUrls,
+        count: categoriesWithUrls.length,
+        user: {
+          id: userId,
+          created_by: userId
+        }
+      });
+    } catch (error) {
+      console.error('Get my categories error:', error);
+      res.status(500).json({ 
+        success: false,
+        error: 'Failed to get categories' 
+      });
     }
   }
 }

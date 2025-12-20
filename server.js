@@ -250,6 +250,7 @@ const initializeDatabase = async () => {
         name VARCHAR(255) NOT NULL,
         description TEXT,
         icon_image VARCHAR(500),
+         created_by INTEGER, 
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
@@ -334,7 +335,7 @@ const initializeDatabase = async () => {
                     EXECUTE FUNCTION update_updated_at_column();
             `;
 
-            
+
       await pool.query(createTableQuery);
       console.log('✅ Suppliers table created successfully!');
       console.log("🔍 Checking if stocks table exists...");
