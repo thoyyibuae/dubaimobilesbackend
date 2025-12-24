@@ -245,6 +245,73 @@ exports.getbranchwiseStocks = async (req, res) => {
 
 
 
+
+exports.getbranchwiselowStocks = async (req, res) => {
+    try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit); // Add default value here
+        const search = req.query.search || "";
+        const branchId = req.params.id || null;
+        const categoryId = req.query.categoryId || null;
+        const brandId = req.query.brandId || null;
+        const supplierId = req.query.supplierId || null;
+        
+        // Get created_by from authenticated user
+        const createdBy = req.user.userId;
+        
+        // Check if user is admin (you need to set this in your auth middleware)
+        const isAdmin = req.user.role === 'admin'; // or whatever logic you have
+        
+        console.log(`Fetching stocks for ${isAdmin ? 'admin' : 'user'} ID: ${createdBy}`);
+        
+        const offset = (page - 1) * limit;
+
+        // Call model function with createdBy and isAdmin flag
+        const { data, total, statistics } = await Stock.getBranchLowStocks({ 
+            search, 
+            branchId, 
+            categoryId, 
+            brandId, 
+            supplierId, 
+            offset, 
+            limit,
+            createdBy,
+            isAdmin  // Pass isAdmin flag
+        });
+        
+
+        // Calculate totalPages properly
+        const totalPages = limit > 0 ? Math.ceil(total / limit) : 0;
+
+        return res.status(200).json({
+            status: true,
+            message: "Stocks fetched successfully",
+            data,
+            pagination: {
+                page,
+                limit: limit, // Use the parsed limit
+                total,
+                totalPages: totalPages, // Use calculated totalPages
+                hasMore: page < totalPages,
+                outOfStock: statistics.outOfStock,
+                lowStock: statistics.lowStock,
+                totalStockValue: statistics.totalStockValue
+            }
+        });
+
+    } catch (err) {
+        console.error("Get stocks error:", err);
+        return res.status(500).json({
+            status: false,
+            message: "Failed to fetch stocks",
+            error: err.message
+        });
+    }
+};
+
+
+
+
 // exports.getbranchwiseStocks = async (req, res) => {
 //     try {
 //         const page = parseInt(req.query.page) || 1;
