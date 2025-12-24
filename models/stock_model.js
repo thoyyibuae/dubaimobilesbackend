@@ -894,6 +894,7 @@ async getBranchLowStocks({ search, branchId, categoryId, brandId, supplierId, of
             query += ` AND s.branch_id = $${paramCount}`;
             params.push(branchId);
             paramCount++;
+            
         }
         // If branchId is '00' or undefined/null, show low stock from ALL branches
         // No additional branch filter needed for '00'
