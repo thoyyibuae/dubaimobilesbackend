@@ -887,6 +887,130 @@ router.get('/search/quick', authenticateToken, async (req, res) => {
   }
 });
 
+
+router.get('/branchwise/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { 
+      page = 1, 
+      limit = 10 
+    } = req.query;
+
+    // Log for debugging
+    console.log("User ID:", req.user.userId);
+    console.log("Branch ID:", id);
+
+    // Get the branch with department count and verify ownership
+    let branchQuery = `
+      SELECT 
+        b.*,
+        (
+          SELECT COUNT(*) 
+          FROM departments d 
+          WHERE d.branch_id = b.id
+        ) as department_count
+      FROM branches b
+      WHERE b.id = $1
+      AND b.created_by = $2
+    `;
+    
+    const branchParams = [id, req.user.userId];
+    
+    const branchResult = await pool.query(branchQuery, branchParams);
+
+    if (branchResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Branch not found or access denied'
+      });
+    }
+
+    const branch = branchResult.rows[0];
+
+    // Get ALL departments for statistics
+    const allDepartmentsQuery = `
+      SELECT 
+        d.id,
+        d.branch_id as "branchId",
+        d.type,
+        d.name,
+        d.head_id as "headId",
+        d.staff_count as "staffCount",
+        d.is_active as "isActive",
+        d.description,
+        d.contact_email as "contactEmail",
+        d.contact_phone as "contactPhone",
+        d.location,
+        d.budget,
+        d.created_by as "createdBy",
+        d.created_at as "createdAt",
+        d.updated_at as "updatedAt",
+        u.name as "headName",
+        u.email as "headEmail"
+      FROM departments d
+      LEFT JOIN users u ON u.id::text = d.head_id
+      WHERE d.branch_id = $1
+      ORDER BY d.name ASC
+    `;
+
+    const allDepartmentsResult = await pool.query(allDepartmentsQuery, [branch.id]);
+    const allDepartments = allDepartmentsResult.rows;
+
+    // Calculate statistics from ALL department data
+    const totalDepartments = allDepartments.length;
+    const activeDepartments = allDepartments.filter(dept => dept.isActive).length;
+    const inactiveDepartments = totalDepartments - activeDepartments;
+    const totalStaff = allDepartments.reduce((sum, dept) => sum + (dept.staffCount || 0), 0);
+    const totalBudget = allDepartments.reduce((sum, dept) => sum + (parseFloat(dept.budget) || 0), 0);
+
+    // Get paginated departments
+    const offset = (parseInt(page) - 1) * parseInt(limit);
+    const departments = allDepartments.slice(offset, offset + parseInt(limit));
+
+    // Create department names string from paginated departments
+    const departmentNames = departments.map(dept => dept.name).join(', ');
+
+    // Format the branch data exactly like in the list endpoint
+    const branchWithDepartments = {
+      ...branch,
+      department_count: parseInt(branch.department_count || 0),
+      departments: departments, // Paginated department details
+      department_names: departmentNames || "", // Comma-separated names
+      department_stats: {
+        total: totalDepartments,
+        active: activeDepartments,
+        inactive: inactiveDepartments,
+        total_staff: totalStaff,
+        total_budget: totalBudget.toFixed(2),
+        avg_staff_per_dept: totalDepartments > 0 ? (totalStaff / totalDepartments).toFixed(1) : 0,
+        avg_budget_per_dept: totalDepartments > 0 ? (totalBudget / totalDepartments).toFixed(2) : 0
+      }
+    };
+    
+
+    res.json({
+      success: true,
+      data: branchWithDepartments,
+      pagination: {
+        total: totalDepartments,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        totalPages: Math.ceil(totalDepartments / parseInt(limit))
+      }
+    });
+
+    
+  } catch (error) {
+    console.error('Get branch error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch branch'
+    });
+  }
+});
+
+
+
 // GET BRANCH DEPARTMENTS
 router.get('/:id/departments', authenticateToken, async (req, res) => {
   try {

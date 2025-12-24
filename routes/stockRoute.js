@@ -30,6 +30,8 @@ router.use(authenticateToken);
 
 router.post("/", upload.array("images", 10), stockController.createStock);
 router.get("/", stockController.getStocks);
+
+router.get("/branchwise/:id", stockController.getbranchwiseStocks);
 router.get("/:id", stockController.getStockById);
 router.put("/:id", upload.array("images", 10), stockController.updateStock);
 router.delete("/:id", stockController.deleteStock);

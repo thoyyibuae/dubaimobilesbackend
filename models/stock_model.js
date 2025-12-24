@@ -671,6 +671,195 @@ async getAll({ search, branchId, categoryId, brandId, supplierId, offset, limit,
     }
 },
 
+
+
+
+
+async getBranchStocks({ search, branchId, categoryId, brandId, supplierId, offset, limit, createdBy, isAdmin = false }) {
+    try {
+        // Validate that branchId is provided for branch-wise endpoint
+        if (!branchId) {
+            throw new Error('Branch ID is required for branch-wise stock retrieval');
+        }
+
+        let query = `
+            SELECT 
+                s.*,
+                b.name AS brand_name,
+                c.name AS category_name,
+                br.name AS branch_name,
+                sp.name AS supplier_name
+            FROM stocks s
+            LEFT JOIN brands b ON s.brand_id = b.id
+            LEFT JOIN categories c ON s.category_id = c.id
+            LEFT JOIN branches br ON s.branch_id = br.id
+            LEFT JOIN suppliers sp ON s.supplier_id = sp.id
+            WHERE s.branch_id = $1  -- Branch filter is mandatory
+        `;
+
+        const params = [branchId];
+        let paramCount = 2;
+
+        // Only add created_by filter if NOT admin and createdBy is provided
+        if (createdBy) {
+            query += ` AND s.created_by = $${paramCount}`;
+            params.push(createdBy);
+            paramCount++;
+        }
+
+        // Search filter
+        if (search && search.trim() !== "") {
+            query += ` AND (
+                s.name ILIKE $${paramCount} OR
+                s.sku ILIKE $${paramCount}
+            )`;
+            params.push(`%${search.trim()}%`);
+            paramCount++;
+        }
+
+        // Category filter
+        if (categoryId) {
+            query += ` AND s.category_id = $${paramCount}`;
+            params.push(categoryId);
+            paramCount++;
+        }
+
+        // Brand filter
+        if (brandId) {
+            query += ` AND s.brand_id = $${paramCount}`;
+            params.push(brandId);
+            paramCount++;
+        }
+
+        // Supplier filter
+        if (supplierId) {
+            query += ` AND s.supplier_id = $${paramCount}`;
+            params.push(supplierId);
+            paramCount++;
+        }
+
+        // ORDER BY
+        query += ` ORDER BY s.id DESC`;
+
+        // 1. First get total count
+        const countQuery = `
+            SELECT COUNT(*) AS total
+            FROM (${query}) AS sub
+        `;
+
+        const countResult = await pool.query(countQuery, params);
+        const total = parseInt(countResult.rows[0].total, 10);
+
+        // 2. Get statistics for ALL filtered items
+        // Build stats query base
+        let statsQuery = `
+            SELECT 
+                COUNT(*) FILTER (WHERE s.quantity < 1) as out_of_stock,
+                COUNT(*) FILTER (WHERE s.quantity < 5) as low_stock,
+                COALESCE(SUM(s.cost_price * s.quantity), 0) as total_value
+            FROM stocks s
+            WHERE s.branch_id = $1  -- Branch filter is mandatory for stats too
+        `;
+
+        // Build stats parameters separately
+        const statsParams = [branchId];
+        let statsParamCount = 2;
+
+        // Only add created_by filter if NOT admin and createdBy is provided
+        if (createdBy) {
+            statsQuery += ` AND s.created_by = $${statsParamCount}`;
+            statsParams.push(createdBy);
+            statsParamCount++;
+        }
+
+        // Add same filters to stats query
+        if (search && search.trim() !== "") {
+            statsQuery += ` AND (s.name ILIKE $${statsParamCount} OR s.sku ILIKE $${statsParamCount})`;
+            statsParams.push(`%${search.trim()}%`);
+            statsParamCount++;
+        }
+
+        if (categoryId) {
+            statsQuery += ` AND s.category_id = $${statsParamCount}`;
+            statsParams.push(categoryId);
+            statsParamCount++;
+        }
+
+        if (brandId) {
+            statsQuery += ` AND s.brand_id = $${statsParamCount}`;
+            statsParams.push(brandId);
+            statsParamCount++;
+        }
+
+        if (supplierId) {
+            statsQuery += ` AND s.supplier_id = $${statsParamCount}`;
+            statsParams.push(supplierId);
+            statsParamCount++;
+        }
+
+        const statsResult = await pool.query(statsQuery, statsParams);
+        const stats = statsResult.rows[0];
+
+        // 3. Apply pagination to main query if limit is provided
+        if (limit && limit > 0) {
+            query += ` LIMIT $${paramCount} OFFSET $${paramCount + 1}`;
+            params.push(limit, offset);
+            paramCount += 2;
+        }
+
+        // 4. Fetch paginated data
+        const dataResult = await pool.query(query, params);
+
+        // Format result - EXACT SAME FORMAT as your getAll method
+        const data = dataResult.rows.map(row => ({
+            id: row.id,
+            name: row.name,
+            sku: row.sku,
+            description: row.description,
+            category_id: row.category_id,
+            brand_id: row.brand_id,
+            branch_id: row.branch_id,
+            supplier_id: row.supplier_id,
+            cost_price: row.cost_price,
+            selling_price: row.selling_price,
+            dealer_price: row.dealer_price,
+            shop_price: row.shop_price,
+            quantity: row.quantity,
+            low_stock_threshold: row.low_stock_threshold,
+            unit: row.unit,
+            status: row.status,
+            images: row.images || [],
+            specifications: row.specifications || {},
+            created_by: row.created_by,  // Include created_by in response
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+
+            // Related joins
+            brand: row.brand_id ? { id: row.brand_id, name: row.brand_name } : null,
+            category: row.category_id ? { id: row.category_id, name: row.category_name } : null,
+            branch: row.branch_id ? { id: row.branch_id, name: row.branch_name } : null,
+            supplier: row.supplier_id ? { id: row.supplier_id, name: row.supplier_name } : null
+        }));
+
+        // Return with statistics - EXACT SAME RESPONSE STRUCTURE
+        return { 
+            data, 
+            total,
+            statistics: {
+                outOfStock: parseInt(stats.out_of_stock || 0),
+                lowStock: parseInt(stats.low_stock || 0),
+                totalStockValue: parseFloat(stats.total_value || 0)
+            }
+        };
+
+    } catch (error) {
+        console.error("Get branch stocks error:", error);
+        throw error;
+    }
+},
+
+
+
 // In your Stock.js model
 async getStatistics({ search, branchId, categoryId, brandId, supplierId }) {
     try {
