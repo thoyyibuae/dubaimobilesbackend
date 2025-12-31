@@ -120,182 +120,183 @@ const initializeDatabase = async () => {
     //       }
 
     //       // Check if branches table exists
-    //       const branchesTableExists = await client.query(`
-    //       SELECT EXISTS (
-    //         SELECT FROM information_schema.tables 
-    //         WHERE table_schema = 'public' 
-    //         AND table_name = 'branches'
-    //       )
-    //     `);
+          const branchesTableExists = await client.query(`
+          SELECT EXISTS (
+            SELECT FROM information_schema.tables 
+            WHERE table_schema = 'public' 
+            AND table_name = 'branches'
+          )
+        `);
 
-    //       if (!branchesTableExists.rows[0].exists) {
-    //         // Create branches table
-    //         console.log('📁 Creating branches table...');
-    //         await client.query(`
-    //         CREATE TABLE branches (
-    //           id SERIAL PRIMARY KEY,
-    //           name VARCHAR(255) NOT NULL,
-    //           code VARCHAR(50) UNIQUE NOT NULL,
-    //           address TEXT DEFAULT '',
-    //           city VARCHAR(100) DEFAULT '',
-    //           state VARCHAR(100) DEFAULT '',
-    //           country VARCHAR(100) DEFAULT 'USA',
-    //           postal_code VARCHAR(20) DEFAULT '',
-    //           phone VARCHAR(20) DEFAULT '',
-    //           email VARCHAR(100) DEFAULT '',
-    //           manager_id VARCHAR(100) DEFAULT '',
-    //           latitude DECIMAL(10, 8) DEFAULT 0.0,
-    //           longitude DECIMAL(11, 8) DEFAULT 0.0,
-    //           opening_date DATE DEFAULT CURRENT_DATE,
-    //           status VARCHAR(20) DEFAULT 'active',
-    //           currency VARCHAR(10) DEFAULT 'USD',
-    //           supported_payment_methods TEXT[] DEFAULT ARRAY['cash', 'card', 'upi'],
-    //           operating_hours JSONB DEFAULT '{
-    //             "monday": {"open": "09:00", "close": "21:00"},
-    //             "tuesday": {"open": "09:00", "close": "21:00"},
-    //             "wednesday": {"open": "09:00", "close": "21:00"},
-    //             "thursday": {"open": "09:00", "close": "21:00"},
-    //             "friday": {"open": "09:00", "close": "21:00"},
-    //             "saturday": {"open": "10:00", "close": "20:00"},
-    //             "sunday": {"open": "11:00", "close": "18:00"}
-    //           }'::jsonb,
-    //           departments JSONB DEFAULT '[]'::jsonb,
-    //           settings JSONB DEFAULT '{}'::jsonb,
-    //           created_by VARCHAR(100) DEFAULT '',
-    //           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    //           updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    //           CONSTRAINT valid_status CHECK (status IN ('active', 'inactive', 'maintenance', 'closed'))
-    //         )
-    //       `);
-    //         console.log('✅ Branches table created');
+          if (!branchesTableExists.rows[0].exists) {
+            // Create branches table
+            console.log('📁 Creating branches table...');
+            await client.query(`
+            CREATE TABLE branches (
+              id SERIAL PRIMARY KEY,
+              name VARCHAR(255) NOT NULL,
+              code VARCHAR(50) UNIQUE NOT NULL,
+              address TEXT DEFAULT '',
+              city VARCHAR(100) DEFAULT '',
+              state VARCHAR(100) DEFAULT '',
+              country VARCHAR(100) DEFAULT 'USA',
+              postal_code VARCHAR(20) DEFAULT '',
+              phone VARCHAR(20) DEFAULT '',
+              email VARCHAR(100) DEFAULT '',
+              manager_id VARCHAR(100) DEFAULT '',
+              latitude DECIMAL(10, 8) DEFAULT 0.0,
+              longitude DECIMAL(11, 8) DEFAULT 0.0,
+              opening_date DATE DEFAULT CURRENT_DATE,
+              status VARCHAR(20) DEFAULT 'active',
+              currency VARCHAR(10) DEFAULT 'USD',
+              supported_payment_methods TEXT[] DEFAULT ARRAY['cash', 'card', 'upi'],
+              operating_hours JSONB DEFAULT '{
+                "monday": {"open": "09:00", "close": "21:00"},
+                "tuesday": {"open": "09:00", "close": "21:00"},
+                "wednesday": {"open": "09:00", "close": "21:00"},
+                "thursday": {"open": "09:00", "close": "21:00"},
+                "friday": {"open": "09:00", "close": "21:00"},
+                "saturday": {"open": "10:00", "close": "20:00"},
+                "sunday": {"open": "11:00", "close": "18:00"}
+              }'::jsonb,
+              departments JSONB DEFAULT '[]'::jsonb,
+              settings JSONB DEFAULT '{}'::jsonb,
+              created_by VARCHAR(100) DEFAULT '',
+              created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+              updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+              CONSTRAINT valid_status CHECK (status IN ('active', 'inactive', 'maintenance', 'closed'))
+            )
+          `);
+            console.log('✅ Branches table created');
 
-    //         // Create indexes
-    //         await client.query(`
-    //         CREATE INDEX idx_branches_status ON branches(status);
-    //         CREATE INDEX idx_branches_country ON branches(country);
-    //         CREATE INDEX idx_branches_city ON branches(city);
-    //         CREATE INDEX idx_branches_code ON branches(code);
-    //       `);
-    //         console.log('✅ Indexes created');
-    //       }
+            // Create indexes
+            await client.query(`
+            CREATE INDEX idx_branches_status ON branches(status);
+            CREATE INDEX idx_branches_country ON branches(country);
+            CREATE INDEX idx_branches_city ON branches(city);
+            CREATE INDEX idx_branches_code ON branches(code);
+          `);
+            console.log('✅ Indexes created');
+          }
 
-    //       // Check if departments table exists
-    //       const departmentsExists = await client.query(`
-    //   SELECT EXISTS (
-    //     SELECT FROM information_schema.tables 
-    //     WHERE table_schema = 'public' 
-    //     AND table_name = 'departments'
-    //   )
-    // `);
+          // Check if departments table exists
+          const departmentsExists = await client.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = 'departments'
+      )
+    `);
 
-    //       if (!departmentsExists.rows[0].exists) {
-    //         console.log('📁 Creating departments table...');
-    //         await client.query(`
-    //     CREATE TABLE departments (
-    //       id SERIAL PRIMARY KEY,
-    //       branch_id INTEGER NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
-    //       type VARCHAR(100) NOT NULL,
-    //       name VARCHAR(255) NOT NULL,
-    //       head_id VARCHAR(100) NOT NULL,
-    //       staff_count INTEGER DEFAULT 0,
-    //       is_active BOOLEAN DEFAULT true,
-    //       description TEXT,
-    //       contact_email VARCHAR(100),
-    //       contact_phone VARCHAR(20),
-    //       location VARCHAR(255),
-    //       budget DECIMAL(15, 2) DEFAULT 0.00,
-    //       created_by VARCHAR(100) DEFAULT '',
-    //       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    //       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    //       CONSTRAINT valid_staff_count CHECK (staff_count >= 0),
-    //       CONSTRAINT valid_budget CHECK (budget >= 0)
-    //     )
-    //   `);
-    //         console.log('✅ Departments table created');
+          if (!departmentsExists.rows[0].exists) {
+            console.log('📁 Creating departments table...');
+            await client.query(`
+        CREATE TABLE departments (
+          id SERIAL PRIMARY KEY,
+          branch_id INTEGER NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
+          type VARCHAR(100) NOT NULL,
+          name VARCHAR(255) NOT NULL,
+          head_id VARCHAR(100) NOT NULL,
+          staff_count INTEGER DEFAULT 0,
+          is_active BOOLEAN DEFAULT true,
+          description TEXT,
+          contact_email VARCHAR(100),
+          contact_phone VARCHAR(20),
+          location VARCHAR(255),
+          budget DECIMAL(15, 2) DEFAULT 0.00,
+          created_by VARCHAR(100) DEFAULT '',
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          CONSTRAINT valid_staff_count CHECK (staff_count >= 0),
+          CONSTRAINT valid_budget CHECK (budget >= 0)
+        )
+      `);
+            console.log('✅ Departments table created');
 
-    //         // Create indexes for departments table
-    //         await client.query(`
-    //     CREATE INDEX idx_departments_branch_id ON departments(branch_id);
-    //     CREATE INDEX idx_departments_type ON departments(type);
-    //     CREATE INDEX idx_departments_head_id ON departments(head_id);
-    //     CREATE INDEX idx_departments_is_active ON departments(is_active);
-    //   `);
-    //         console.log('✅ Department indexes created');
-    //       }
+            // Create indexes for departments table
+            await client.query(`
+        CREATE INDEX idx_departments_branch_id ON departments(branch_id);
+        CREATE INDEX idx_departments_type ON departments(type);
+        CREATE INDEX idx_departments_head_id ON departments(head_id);
+        CREATE INDEX idx_departments_is_active ON departments(is_active);
+      `);
+            console.log('✅ Department indexes created');
+          }
 
-    //       await pool.query(`
-    //       CREATE TABLE IF NOT EXISTS brands (
-    //         id SERIAL PRIMARY KEY,
-    //         name VARCHAR(255) NOT NULL,
-    //         description TEXT,
-    //         icon_image VARCHAR(500),
-    //         created_by INTEGER,  
-    //         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    //         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    //       );
-    //     `);
+          await pool.query(`
+          CREATE TABLE IF NOT EXISTS brands (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR(255) NOT NULL,
+            description TEXT,
+            icon_image VARCHAR(500),
+            created_by INTEGER,  
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          );
+        `);
 
 
 
-    //       // Create index for brands
-    //       await pool.query(`
-    //       CREATE INDEX IF NOT EXISTS idx_brands_name ON brands(name);
-    //     `);
+          // Create index for brands
+          await pool.query(`
+          CREATE INDEX IF NOT EXISTS idx_brands_name ON brands(name);
+        `);
 
-    //       console.log('✅ Brands table created/verified');
+          console.log('✅ Brands table created/verified');
 
-    //       // Create Categories table
-    //       await pool.query(`
-    //       CREATE TABLE IF NOT EXISTS categories (
-    //         id SERIAL PRIMARY KEY,
-    //         name VARCHAR(255) NOT NULL,
-    //         description TEXT,
-    //         icon_image VARCHAR(500),
-    //          created_by INTEGER, 
-    //         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    //         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    //       );
-    //     `);
+          // Create Categories table
+          await pool.query(`
+          CREATE TABLE IF NOT EXISTS categories (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR(255) NOT NULL,
+            description TEXT,
+            icon_image VARCHAR(500),
+             created_by INTEGER, 
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          );
+        `);
 
-    //       // Create index for categories
-    //       await pool.query(`
-    //       CREATE INDEX IF NOT EXISTS idx_categories_name ON categories(name);
-    //     `);
+          // Create index for categories
+          await pool.query(`
+          CREATE INDEX IF NOT EXISTS idx_categories_name ON categories(name);
+        `);
 
-    //       console.log('✅ Categories table created/verified');
+          console.log('✅ Categories table created/verified');
 
-    //       // Create trigger function for updating updated_at timestamp
-    //       await pool.query(`
-    //       CREATE OR REPLACE FUNCTION update_updated_at_column()
-    //       RETURNS TRIGGER AS $$
-    //       BEGIN
-    //         NEW.updated_at = CURRENT_TIMESTAMP;
-    //         RETURN NEW;
-    //       END;
-    //       $$ language 'plpgsql';
-    //     `);
+          // Create trigger function for updating updated_at timestamp
+          await pool.query(`
+          CREATE OR REPLACE FUNCTION update_updated_at_column()
+          RETURNS TRIGGER AS $$
+          BEGIN
+            NEW.updated_at = CURRENT_TIMESTAMP;
+            RETURN NEW;
+          END;
+          $$ language 'plpgsql';
+        `);
 
-    //       // Create triggers for both tables
-    //       await pool.query(`
-    //       DROP TRIGGER IF EXISTS update_brands_updated_at ON brands;
-    //       CREATE TRIGGER update_brands_updated_at
-    //       BEFORE UPDATE ON brands
-    //       FOR EACH ROW
-    //       EXECUTE FUNCTION update_updated_at_column();
-    //     `);
+          // Create triggers for both tables
+          await pool.query(`
+          DROP TRIGGER IF EXISTS update_brands_updated_at ON brands;
+          CREATE TRIGGER update_brands_updated_at
+          BEFORE UPDATE ON brands
+          FOR EACH ROW
+          EXECUTE FUNCTION update_updated_at_column();
+        `);
 
-    //       await pool.query(`
-    //       DROP TRIGGER IF EXISTS update_categories_updated_at ON categories;
-    //       CREATE TRIGGER update_categories_updated_at
-    //       BEFORE UPDATE ON categories
-    //       FOR EACH ROW
-    //       EXECUTE FUNCTION update_updated_at_column();
-    //     `);
-    //     }
+          await pool.query(`
+          DROP TRIGGER IF EXISTS update_categories_updated_at ON categories;
+          CREATE TRIGGER update_categories_updated_at
+          BEFORE UPDATE ON categories
+          FOR EACH ROW
+          EXECUTE FUNCTION update_updated_at_column();
+        `);
+        
 
 
     
-    const tableExists = await client.query(`
+   
+ const tableExistsUsers = await client.query(`
   SELECT EXISTS (
     SELECT FROM information_schema.tables 
     WHERE table_schema = 'public' 
@@ -303,7 +304,8 @@ const initializeDatabase = async () => {
   )
 `);
 
-    if (!tableExists.rows[0].exists) {
+
+    if (!tableExistsUsers.rows[0].exists) {
       // Create users table with ALL new columns
       console.log('📁 Creating users table with extended schema...');
 
@@ -357,7 +359,6 @@ const initializeDatabase = async () => {
         console.log('⚠️ Role constraint update:', error.message);
       }
     }
-
 
 
     const checkTableQuery = `
@@ -587,3 +588,19 @@ const startServer = async () => {
 };
 
 startServer();
+
+
+
+
+
+// PS F:\dubai_mobiles\backend\dubai_mobiles_2> git push origin HEAD:master
+// Enumerating objects: 5, done.
+// Counting objects: 100% (5/5), done.    
+// Delta compression using up to 4 threads
+// Compressing objects: 100% (3/3), done.
+// Writing objects: 100% (3/3), 343 bytes | 171.00 KiB/s, done.
+// Total 3 (delta 2), reused 0 (delta 0), pack-reused 0
+// remote: Resolving deltas: 100% (2/2), completed with 2 local objects.
+// To https://github.com/thoyyibuae/dubaimobilesbackend.git
+//    97cc47c..4bcdbc0  HEAD -> master
+// PS F:\dubai_mobiles\backend\dubai_mobiles_2> 
