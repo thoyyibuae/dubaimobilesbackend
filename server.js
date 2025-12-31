@@ -308,7 +308,7 @@ const initializeDatabase = async () => {
       console.log('📁 Creating users table with extended schema...');
 
 
-      
+      //user create or add 
 
       await client.query(`
         -- Complete table with multiple images in id_proof_images as JSON array
