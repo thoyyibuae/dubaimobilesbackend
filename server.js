@@ -18,11 +18,14 @@ const transactionRoutes = require('./routes/transactionRoutes');
 
 const normalUserRoutes = require('./routes/normal_user_routes');
 
+const subcategoriesRoutes = require('./routes/subcategoryRoutes');
+
 
 const { initializeDatabases } = require('./config/database');
 
 const { createNormalUsersTable, testConnection } = require('./config/normal_users_db');
 
+   const { initializeSubCategoryDatabases } = require('./config/subcategory_database');
 
 
 
@@ -294,6 +297,21 @@ const initializeDatabase = async () => {
         
 
 
+
+
+        // Create Subcategories table
+          await pool.query(`
+            CREATE TABLE IF NOT EXISTS subcategories (
+              id SERIAL PRIMARY KEY,
+              maincategoryId INTEGER NOT NULL,
+              subName VARCHAR(255) NOT NULL,
+              icon_image VARCHAR(500),
+              created_by INTEGER,
+              created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+              updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+              FOREIGN KEY (maincategoryId) REFERENCES categories(id) ON DELETE CASCADE
+            );
+          `);
     
    
  const tableExistsUsers = await client.query(`
@@ -413,6 +431,13 @@ const initializeDatabase = async () => {
     // ALWAYS CHECK / CREATE STOCKS TABLE
     console.log("🔍 Checking if stocks table exists...");
 
+
+
+
+
+
+
+
     const stocksTableExists = await pool.query(`
   SELECT EXISTS (
     SELECT FROM information_schema.tables
@@ -494,6 +519,7 @@ const startServer = async () => {
 
     const dbResult = await initializeDatabases();
 
+
     if (dbResult.success) {
       console.log('✅ Database initialized successfully');
     } else {
@@ -508,6 +534,16 @@ const startServer = async () => {
     }
 
 
+    const dbResultSubcategory = await initializeSubCategoryDatabases();
+
+
+    if (dbResultSubcategory.success) {
+      console.log('✅ Database initialized successfully with subcategory');
+    } else {
+      console.warn('⚠️ Database initialization had issues, but continuing...');
+    }
+ 
+
 
     // Routes
     app.use('/api/auth/admin', authRoutes);
@@ -519,6 +555,11 @@ const startServer = async () => {
     app.use('/api/stocks', stockRoutes);
     app.use('/api/transactions/user', transactionRoutes);
     app.use('/api/normal-users', normalUserRoutes);
+   app.use('/api/subcategories', subcategoriesRoutes);
+
+
+    
+   
 
 
     // Health check endpoint
