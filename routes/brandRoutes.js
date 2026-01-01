@@ -11,6 +11,11 @@ router.use(authenticateToken);
 // Create brand with icon upload
 router.post('/', upload.single('icon_image'), BrandController.createBrand);
 
+
+
+// router.post('/brands', upload.single('icon_image'), brandController.createBrand);
+// router.put('/brands/:id', upload.single('icon_image'), brandController.updateBrand);
+
 // Get all brands
 router.get('/', BrandController.getAllBrands);
 
@@ -24,3 +29,6 @@ router.put('/:id', upload.single('icon_image'), BrandController.updateBrand);
 router.delete('/:id', BrandController.deleteBrand);
 
 module.exports = router;
+
+
+// Use in your routes

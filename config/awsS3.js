@@ -100,6 +100,7 @@ class S3Service {
   // Upload file to S3 (consistent with user_model.js pattern)
   async uploadFile(file, subcategoryId = null) {
     try {
+
       let fileBuffer, contentType, originalName;
       
       // Handle different file input formats
@@ -172,6 +173,145 @@ class S3Service {
     }
   }
 
+
+async uploadBrandFile(file, brandId = null) {
+  try {
+    console.log("=== S3 UPLOAD DEBUG ===");
+    console.log("Received file object:", {
+      type: typeof file,
+      isObject: typeof file === 'object',
+      keys: Object.keys(file || {}),
+      path: file?.path,
+      bufferExists: file?.buffer ? `Buffer length: ${file.buffer.length}` : 'No buffer',
+      mimetype: file?.mimetype,
+      originalname: file?.originalname
+    });
+    
+    let fileBuffer, contentType, originalName;
+    const fs = require('fs'); // Add this at the top
+    
+    // Check if file has a path property (saved to disk)
+    if (file && file.path && fs.existsSync(file.path)) {
+      console.log("Reading file from disk path:", file.path);
+      fileBuffer = fs.readFileSync(file.path);
+      contentType = file.mimetype || 'application/octet-stream';
+      originalName = file.originalname || path.basename(file.path);
+    }
+    // Check if file is a Buffer directly
+    else if (file instanceof Buffer) {
+      console.log("File is a Buffer directly");
+      fileBuffer = file;
+      contentType = 'application/octet-stream';
+      originalName = 'file.bin';
+    }
+    // Handle multer file object with buffer
+    else if (file && file.buffer && Buffer.isBuffer(file.buffer)) {
+      console.log("File has buffer property");
+      fileBuffer = file.buffer;
+      contentType = file.mimetype || 'application/octet-stream';
+      originalName = file.originalname || 'file';
+    }
+    // Handle file with data property (alternative format)
+    else if (file && file.data && Buffer.isBuffer(file.data)) {
+      console.log("File has data property");
+      fileBuffer = file.data;
+      contentType = file.mimetype || file.type || 'application/octet-stream';
+      originalName = file.name || file.originalname || 'file';
+    }
+    // Handle base64 file
+    else if (file && file.base64) {
+      console.log("File has base64 property");
+      const base64Data = file.base64.replace(/^data:image\/\w+;base64,/, '');
+      fileBuffer = Buffer.from(base64Data, 'base64');
+      contentType = file.type || 'image/jpeg';
+      originalName = 'image.jpg';
+    }
+    else {
+      console.log("Invalid file format received:", file);
+      throw new Error('Invalid file format. Expected: file object with path, buffer, or base64 string');
+    }
+    
+    console.log("File processing complete:", {
+      bufferLength: fileBuffer.length,
+      contentType,
+      originalName
+    });
+
+    // Determine file extension
+    let fileExtension = 'jpg';
+    if (originalName) {
+      const parts = originalName.split('.');
+      if (parts.length > 1) {
+        const ext = parts.pop().toLowerCase();
+        const validExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'];
+        if (validExtensions.includes(ext)) {
+          fileExtension = ext;
+        }
+      }
+    } else if (contentType) {
+      if (contentType.includes('jpeg') || contentType.includes('jpg')) {
+        fileExtension = 'jpg';
+      } else if (contentType.includes('png')) {
+        fileExtension = 'png';
+      } else if (contentType.includes('gif')) {
+        fileExtension = 'gif';
+      } else if (contentType.includes('webp')) {
+        fileExtension = 'webp';
+      }
+    }
+
+    // Generate unique filename
+    const timestamp = Date.now();
+    const randomId = uuidv4().split('-')[0];
+    const uniqueFileName = `brands_${brandId || 'temp'}_${timestamp}_${randomId}.${fileExtension}`;
+    const s3Key = `brands/${uniqueFileName}`;
+    
+    console.log(`Uploading to S3: ${s3Key}, Content-Type: ${contentType}`);
+
+    const params = {
+      Bucket: BUCKET_NAME,
+      Key: s3Key,
+      Body: fileBuffer,
+      ContentType: contentType
+    };
+
+    console.log("S3 upload params prepared");
+    const uploadResult = await s3.upload(params).promise();
+    console.log(`✅ File uploaded successfully: ${uploadResult.Location}`);
+    
+    // Clean up: Delete local file after upload if it exists
+    if (file && file.path && fs.existsSync(file.path)) {
+      try {
+        fs.unlinkSync(file.path);
+        console.log(`Cleaned up local file: ${file.path}`);
+      } catch (cleanupError) {
+        console.warn('Could not delete local file:', cleanupError.message);
+      }
+    }
+    
+    return {
+      url: uploadResult.Location,
+      key: uploadResult.Key,
+      fileName: uniqueFileName
+    };
+  } catch (error) {
+    console.error('S3 upload error details:', {
+      message: error.message,
+      stack: error.stack,
+      code: error.code,
+      statusCode: error.statusCode
+    });
+    throw new Error(`Failed to upload file to S3: ${error.message}`);
+  }
+}
+
+
+
+
+
+
+
+
   // Upload base64 image (consistent with user_model.js pattern)
   async uploadBase64Image(base64String, subcategoryId = null, contentType = 'image/jpeg') {
     try {
@@ -221,6 +361,60 @@ class S3Service {
       throw new Error(`Failed to upload base64 image to S3: ${error.message}`);
     }
   }
+
+
+
+  // Upload base64 image (consistent with user_model.js pattern)
+  async uploadBrandBase64Image(base64String, brandId = null, contentType = 'image/jpeg') {
+    try {
+      const base64Data = base64String.replace(/^data:image\/\w+;base64,/, '');
+      const buffer = Buffer.from(base64Data, 'base64');
+      
+      // Determine file extension
+      let fileExtension = 'jpg';
+      if (contentType) {
+        if (contentType.includes('jpeg') || contentType.includes('jpg')) {
+          fileExtension = 'jpg';
+        } else if (contentType.includes('png')) {
+          fileExtension = 'png';
+        } else if (contentType.includes('gif')) {
+          fileExtension = 'gif';
+        } else if (contentType.includes('webp')) {
+          fileExtension = 'webp';
+        }
+      }
+      
+      // Generate unique filename
+      const timestamp = Date.now();
+      const randomId = uuidv4().split('-')[0];
+      const uniqueFileName = `brand_${brandId || 'temp'}_${timestamp}_${randomId}.${fileExtension}`;
+      const s3Key = `brands/${uniqueFileName}`;
+      
+      console.log(`Uploading base64 image to S3: ${s3Key}, Size: ${buffer.length} bytes`);
+
+      const params = {
+        Bucket: BUCKET_NAME,
+        Key: s3Key,
+        Body: buffer,
+        ContentType: contentType
+      };
+
+      const uploadResult = await s3.upload(params).promise();
+      console.log(`✅ Base64 image uploaded successfully: ${uploadResult.Location}`);
+      
+      return {
+        url: uploadResult.Location,
+        key: uploadResult.Key,
+        fileName: uniqueFileName
+      };
+    } catch (error) {
+      console.error('S3 base64 upload error:', error);
+      throw new Error(`Failed to upload base64 image to S3: ${error.message}`);
+    }
+  }
+
+  
+
 
   // Delete file from S3 (consistent with user_model.js pattern)
   async deleteFile(fileUrl) {
