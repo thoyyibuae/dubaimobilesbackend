@@ -174,6 +174,187 @@ class S3Service {
   }
 
 
+async uploadCategoryFile(file, categoryId = null) {
+  try {
+    const fs = require('fs');
+    
+const path = require('path');
+    console.log("=== UPLOAD CATEGORY FILE DEBUG ===");
+    console.log("File object received:", {
+      hasBuffer: !!file?.buffer,
+      hasPath: !!file?.path,
+      fieldname: file?.fieldname,
+      originalname: file?.originalname,
+      mimetype: file?.mimetype,
+      size: file?.size
+    });
+
+    let fileBuffer, contentType, originalName;
+    
+    // 1. First check if file has a path (disk storage)
+    if (file && file.path && fs.existsSync(file.path)) {
+      console.log("📁 Reading file from disk path:", file.path);
+      fileBuffer = fs.readFileSync(file.path);
+      contentType = file.mimetype || 'application/octet-stream';
+      originalName = file.originalname || path.basename(file.path);
+    }
+    // 2. Check if file has buffer (memory storage)
+    else if (file && file.buffer) {
+      console.log("📁 Reading file from buffer");
+      fileBuffer = file.buffer;
+      contentType = file.mimetype || 'application/octet-stream';
+      originalName = file.originalname || 'file';
+    }
+    // 3. Handle multer file object without buffer/path (edge case)
+    else if (file && file.fieldname) {
+      console.log("📁 File has fieldname but no buffer/path");
+      // This shouldn't happen, but handle gracefully
+      throw new Error('Invalid file object. File has no buffer or path.');
+    }
+    // 4. Handle base64 file
+    else if (file && file.base64) {
+      console.log("📁 Reading file from base64");
+      const base64Data = file.base64.replace(/^data:image\/\w+;base64,/, '');
+      fileBuffer = Buffer.from(base64Data, 'base64');
+      contentType = file.type || 'image/jpeg';
+      originalName = 'image.jpg';
+    }
+    else {
+      console.log("❌ Invalid file format. File object:", file);
+      throw new Error('Invalid file format. Expected file object with path, buffer, or base64.');
+    }
+
+    console.log("📊 File info extracted:", {
+      bufferLength: fileBuffer?.length || 0,
+      contentType,
+      originalName
+    });
+
+    // Determine file extension
+    let fileExtension = 'jpg';
+    if (originalName) {
+      const ext = path.extname(originalName).toLowerCase().replace('.', '');
+      const validExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'];
+      if (validExtensions.includes(ext)) {
+        fileExtension = ext;
+      } else if (ext) {
+        console.log(`⚠️ Unusual extension: ${ext}, defaulting to jpg`);
+      }
+    } else if (contentType) {
+      if (contentType.includes('jpeg') || contentType.includes('jpg')) {
+        fileExtension = 'jpg';
+      } else if (contentType.includes('png')) {
+        fileExtension = 'png';
+      } else if (contentType.includes('gif')) {
+        fileExtension = 'gif';
+      } else if (contentType.includes('webp')) {
+        fileExtension = 'webp';
+      }
+    }
+
+    // Generate unique filename with timestamp
+    const timestamp = Date.now();
+    const randomId = uuidv4().split('-')[0];
+    const uniqueFileName = `category_${categoryId || 'temp'}_${timestamp}_${randomId}.${fileExtension}`;
+    const s3Key = `categories/${uniqueFileName}`;
+    
+    console.log(`📤 Uploading to S3: ${s3Key}`);
+    console.log(`📊 File size: ${fileBuffer.length} bytes`);
+    console.log(`📄 Content type: ${contentType}`);
+
+    const params = {
+      Bucket: BUCKET_NAME,
+      Key: s3Key,
+      Body: fileBuffer,
+      ContentType: contentType
+      // ACL: 'public-read' // Uncomment if you need public access
+    };
+
+    const uploadResult = await s3.upload(params).promise();
+    console.log(`✅ File uploaded successfully to: ${uploadResult.Location}`);
+    
+    // Clean up: Delete local file after upload if it exists
+    if (file && file.path && fs.existsSync(file.path)) {
+      try {
+        fs.unlinkSync(file.path);
+        console.log(`🧹 Cleaned up local file: ${file.path}`);
+      } catch (cleanupError) {
+        console.warn('⚠ Could not delete local file:', cleanupError.message);
+      }
+    }
+    
+    return {
+      url: uploadResult.Location,
+      key: uploadResult.Key,
+      fileName: uniqueFileName
+    };
+  } catch (error) {
+    console.error('❌ S3 uploadCategoryFile error:', {
+      message: error.message,
+      code: error.code,
+      stack: error.stack
+    });
+    throw new Error(`Failed to upload category file to S3: ${error.message}`);
+  }
+}
+
+async uploadCategoryBase64Image(base64String, categoryId = null, contentType = 'image/jpeg') {
+  try {
+    console.log("📤 Uploading base64 image for category:", categoryId);
+    
+    const base64Data = base64String.replace(/^data:image\/\w+;base64,/, '');
+    const buffer = Buffer.from(base64Data, 'base64');
+    
+    // Determine file extension
+    let fileExtension = 'jpg';
+    if (contentType) {
+      if (contentType.includes('jpeg') || contentType.includes('jpg')) {
+        fileExtension = 'jpg';
+      } else if (contentType.includes('png')) {
+        fileExtension = 'png';
+      } else if (contentType.includes('gif')) {
+        fileExtension = 'gif';
+      } else if (contentType.includes('webp')) {
+        fileExtension = 'webp';
+      }
+    }
+    
+    // Generate unique filename
+    const timestamp = Date.now();
+    const randomId = uuidv4().split('-')[0];
+    const uniqueFileName = `category_${categoryId || 'temp'}_${timestamp}_${randomId}.${fileExtension}`;
+    const s3Key = `categories/${uniqueFileName}`;
+    
+    console.log(`📤 Uploading base64 image to S3: ${s3Key}, Size: ${buffer.length} bytes`);
+
+    const params = {
+      Bucket: BUCKET_NAME,
+      Key: s3Key,
+      Body: buffer,
+      ContentType: contentType
+      // ACL: 'public-read' // Uncomment if you need public access
+    };
+
+    const uploadResult = await s3.upload(params).promise();
+    console.log(`✅ Base64 category image uploaded successfully: ${uploadResult.Location}`);
+    
+    return {
+      url: uploadResult.Location,
+      key: uploadResult.Key,
+      fileName: uniqueFileName
+    };
+  } catch (error) {
+    console.error('❌ S3 uploadCategoryBase64Image error:', error);
+    throw new Error(`Failed to upload base64 category image to S3: ${error.message}`);
+  }
+}
+
+
+
+  
+
+
+
 async uploadBrandFile(file, brandId = null) {
   try {
     console.log("=== S3 UPLOAD DEBUG ===");
@@ -306,6 +487,54 @@ async uploadBrandFile(file, brandId = null) {
 }
 
 
+  async uploadCategoryBase64Image(base64String, categoryId = null, contentType = 'image/jpeg') {
+    try {
+      const base64Data = base64String.replace(/^data:image\/\w+;base64,/, '');
+      const buffer = Buffer.from(base64Data, 'base64');
+      
+      // Determine file extension
+      let fileExtension = 'jpg';
+      if (contentType) {
+        if (contentType.includes('jpeg') || contentType.includes('jpg')) {
+          fileExtension = 'jpg';
+        } else if (contentType.includes('png')) {
+          fileExtension = 'png';
+        } else if (contentType.includes('gif')) {
+          fileExtension = 'gif';
+        } else if (contentType.includes('webp')) {
+          fileExtension = 'webp';
+        }
+      }
+      
+      // Generate unique filename (like user model)
+      const timestamp = Date.now();
+      const randomId = uuidv4().split('-')[0];
+      const uniqueFileName = `category_${subcategoryId || 'temp'}_${timestamp}_${randomId}.${fileExtension}`;
+      const s3Key = `categories/${uniqueFileName}`;
+      
+      console.log(`Uploading base64 image to S3: ${s3Key}`);
+
+      const params = {
+        Bucket: BUCKET_NAME,
+        Key: s3Key,
+        Body: buffer,
+        ContentType: contentType
+        // ACL: 'public-read' // Uncomment if you need public access
+      };
+
+      const uploadResult = await s3.upload(params).promise();
+      console.log(`✅ Base64 image uploaded successfully: ${uploadResult.Location}`);
+      
+      return {
+        url: uploadResult.Location,
+        key: uploadResult.Key,
+        fileName: uniqueFileName
+      };
+    } catch (error) {
+      console.error('S3 base64 upload error:', error);
+      throw new Error(`Failed to upload base64 image to S3: ${error.message}`);
+    }
+  }
 
 
 

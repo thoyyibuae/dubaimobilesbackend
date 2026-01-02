@@ -117,6 +117,7 @@ exports.getAllSubcategories = async (req, res) => {
 
 exports.getSubcategoryById = async (req, res) => {
   try {
+    
     const subcategory = await Subcategory.findById(req.params.id);
     
     if (!subcategory) {
