@@ -59,68 +59,6 @@ console.log("created stock user :"+createdBy);
 
 
 
-
-// exports.getStocks = async (req, res) => {
-//     try {
-//         const page = parseInt(req.query.page) || 1;
-//         const limit = parseInt(req.query.limit);
-//         const search = req.query.search || "";
-//         const branchId = req.query.branchId || null;
-//         const categoryId = req.query.categoryId || null;
-//         const brandId = req.query.brandId || null;
-//         const suppilerId = req.query.suppilerId || null;
-
-//         const offset = (page - 1) * limit;
-//   // Log for debugging
-//     console.log("User ID:", req.user.userId);
-//     const userId= req.user.userId;
-//     console.log("Query params:", req.query);
-//         // Call model function with filters - NOW INCLUDES STATISTICS
-//         const { data, total, statistics } = await Stock.getAll({ 
-//             search, 
-//             branchId, 
-//             categoryId, 
-//             brandId, 
-//             supplierId: suppilerId, // Map suppilerId to supplierId
-//             offset, 
-//             limit ,
-//            userId
-//         });
-
-//         return res.status(200).json({
-//             status: true,
-//             message: "Stocks fetched successfully",
-//             data,
-//             pagination: {
-//                 page,
-//                 limit,
-//                 total,
-//                 totalPages: Math.ceil(total / limit),
-//                 hasMore: page < Math.ceil(total / limit),
-//                 outOfStock: statistics.outOfStock,        // From ALL filtered data
-//                 lowStock: statistics.lowStock,            // From ALL filtered data
-//                 totalStockValue: statistics.totalStockValue // From ALL filtered data
-//             },
-//             filters: {
-//                 search: search || null,
-//                 branchId: branchId || null,
-//                 categoryId: categoryId || null,
-//                 suppilerId: suppilerId || null,
-//                 brandId: brandId || null
-//             }
-//         });
-
-//     } catch (err) {
-//         console.error("Get stocks error:", err);
-//          res.status(500).json({  status: false,
-//             message: "Failed to fetch stocks",
-//             error: err.message });
-       
-//     }
-// };
-
-
-// In your controller.js
 exports.getStocks = async (req, res) => {
     try {
         const page = parseInt(req.query.page) || 1;
@@ -308,69 +246,6 @@ exports.getbranchwiselowStocks = async (req, res) => {
         });
     }
 };
-
-
-
-
-// exports.getbranchwiseStocks = async (req, res) => {
-//     try {
-//         const page = parseInt(req.query.page) || 1;
-//         const limit = parseInt(req.query.limit);
-//         const search = req.query.search || "";
-//         const branchId = req.params.id || null;
-//         const categoryId = req.query.categoryId || null;
-//         const brandId = req.query.brandId || null;
-//         const supplierId = req.query.supplierId || null;
-        
-//         // Get created_by from authenticated user
-//         const createdBy = req.user.userId;
-
-        
-//         // Check if user is admin (you need to set this in your auth middleware)
-//         const isAdmin = req.user.role === 'admin'; // or whatever logic you have
-        
-//         console.log(`Fetching stocks for ${isAdmin ? 'admin' : 'user'} ID: ${createdBy}`);
-        
-//         const offset = (page - 1) * limit;
-
-//         // Call model function with createdBy and isAdmin flag
-//         const { data, total, statistics } = await Stock.getBranchStocks({ 
-//             search, 
-//             branchId, 
-//             categoryId, 
-//             brandId, 
-//             supplierId, 
-//             offset, 
-//             limit,
-//             createdBy,
-//             isAdmin  // Pass isAdmin flag
-//         });
-
-//         return res.status(200).json({
-//             status: true,
-//             message: "Stocks fetched successfully",
-//             data,
-//             pagination: {
-//                 page,
-//                 limit,
-//                 total,
-//                 totalPages: Math.ceil(total / limit),
-//                 hasMore: page < Math.ceil(total / limit),
-//                 outOfStock: statistics.outOfStock,
-//                 lowStock: statistics.lowStock,
-//                 totalStockValue: statistics.totalStockValue
-//             }
-//         });
-
-//     } catch (err) {
-//         console.error("Get stocks error:", err);
-//         return res.status(500).json({
-//             status: false,
-//             message: "Failed to fetch stocks",
-//             error: err.message
-//         });
-//     }
-// };
 
 
 

@@ -48,9 +48,10 @@ exports.createSubcategory = async (req, res) => {
       createData.icon_image_base64 = subcategoryData.icon_image_base64;
       createData.icon_image_type = subcategoryData.icon_image_type || 'image/jpeg';
     }
+   const  createdBy= req.user.userId;
 
     // Check if subcategory already exists
-    const existingSubcategories = await Subcategory.findAll(1, 1, subcategoryData.subName, subcategoryData.maincategoryId);
+    const existingSubcategories = await Subcategory.findAll(1, 1, subcategoryData.subName, subcategoryData.maincategoryId,createdBy);
     if (existingSubcategories.subcategories.length > 0) {
       return res.status(400).json({ 
         success: false,
@@ -100,7 +101,9 @@ exports.getAllSubcategories = async (req, res) => {
     const search = req.query.search || '';
     const maincategoryId = req.query.maincategoryId || null;
 
-    const result = await Subcategory.findAll(page, limit, search, maincategoryId);
+    
+    const createdBy= req.user.userId;
+    const result = await Subcategory.findAll(page, limit, search, maincategoryId,createdBy);
     
     res.status(200).json({
       success: true,

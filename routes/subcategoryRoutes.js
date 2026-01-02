@@ -62,13 +62,14 @@ router.post('/',
 );
 
 // Get all subcategories with pagination - public access
-router.get('/', subcategoryController.getAllSubcategories);
+router.get('/', authenticateToken,  subcategoryController.getAllSubcategories);
 
 // Get subcategories by category - public access
-router.get('/category/:maincategoryId', subcategoryController.getSubcategoriesByCategory);
+router.get('/category/:maincategoryId', authenticateToken,  subcategoryController.getSubcategoriesByCategory);
 
 // Get single subcategory - public access
-router.get('/:id', subcategoryController.getSubcategoryById);
+router.get('/:id',  authenticateToken, 
+  authorizeRoles('admin', 'superadmin'),  subcategoryController.getSubcategoryById);
 
 // Update subcategory - requires authentication and admin roles
 router.put('/:id', 

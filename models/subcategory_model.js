@@ -170,11 +170,12 @@ static async handleImageUploads(subcategoryData, existingSubcategory = null) {
   }
 
   
+
   // Get all subcategories with pagination
- static async findAll(page = 1, limit = 10, search = '', maincategoryId = null) {
+static async findAll(page = 1, limit = 10, search = '', maincategoryId = null, createdBy = null) {
   try {
     const offset = (page - 1) * limit;
-    
+        //  u.username as created_by_username  -- Join to get creator name
     let query = `
       SELECT 
         s.id,
@@ -185,14 +186,17 @@ static async handleImageUploads(subcategoryData, existingSubcategory = null) {
         s.created_at,
         s.updated_at,
         c.name as category_name
+   
       FROM subcategories s
       LEFT JOIN categories c ON s.maincategoryid = c.id
+      LEFT JOIN users u ON s.created_by = u.id  -- Join with users table
       WHERE 1=1
     `;
     let countQuery = `
       SELECT COUNT(*) 
       FROM subcategories s
       LEFT JOIN categories c ON s.maincategoryid = c.id
+      LEFT JOIN users u ON s.created_by = u.id
       WHERE 1=1
     `;
     
@@ -200,7 +204,7 @@ static async handleImageUploads(subcategoryData, existingSubcategory = null) {
     const countValues = [];
     let paramIndex = 1;
 
-    // Enhanced Search filter - search in both subcategory name AND category name
+    // Enhanced Search filter
     if (search) {
       query += ` AND (s.subname ILIKE $${paramIndex} OR c.name ILIKE $${paramIndex})`;
       countQuery += ` AND (s.subname ILIKE $${paramIndex} OR c.name ILIKE $${paramIndex})`;
@@ -209,12 +213,21 @@ static async handleImageUploads(subcategoryData, existingSubcategory = null) {
       paramIndex++;
     }
 
-    // Category filter - filter by specific maincategoryid
+    // Category filter
     if (maincategoryId) {
       query += ` AND s.maincategoryid = $${paramIndex}`;
       countQuery += ` AND s.maincategoryid = $${paramIndex}`;
       values.push(maincategoryId);
       countValues.push(maincategoryId);
+      paramIndex++;
+    }
+
+    // Created By filter - filter by specific user/creator
+    if (createdBy) {
+      query += ` AND s.created_by = $${paramIndex}`;
+      countQuery += ` AND s.created_by = $${paramIndex}`;
+      values.push(createdBy);
+      countValues.push(createdBy);
       paramIndex++;
     }
 
@@ -224,8 +237,6 @@ static async handleImageUploads(subcategoryData, existingSubcategory = null) {
 
     console.log("FindAll Query:", query);
     console.log("FindAll Values:", values);
-    console.log("FindAll CountQuery:", countQuery);
-    console.log("FindAll CountValues:", countValues);
 
     // Execute both queries
     const [subcategoriesResult, countResult] = await Promise.all([
@@ -235,8 +246,6 @@ static async handleImageUploads(subcategoryData, existingSubcategory = null) {
 
     const total = parseInt(countResult.rows[0].count);
     const totalPages = Math.ceil(total / limit);
-
-    console.log(`Found ${subcategoriesResult.rows.length} subcategories out of ${total} total`);
 
     return {
       subcategories: subcategoriesResult.rows,
