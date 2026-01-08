@@ -1,11 +1,5 @@
-
-
-
-
-
 const admin = require("firebase-admin");
 
-// Direct service account configuration
 const serviceAccount = {
   "type": "service_account",
   "project_id": "dubaimobiles-55807",
@@ -20,13 +14,10 @@ const serviceAccount = {
   "universe_domain": "googleapis.com"
 };
 
-// Initialize Firebase Admin
 if (!admin.apps.length) {
   try {
     admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount),
-      databaseURL: `https://${serviceAccount.project_id}.firebaseio.com`,
-      storageBucket: `${serviceAccount.project_id}.appspot.com`
+      credential: admin.credential.cert(serviceAccount)
     });
     console.log("✅ Firebase Admin initialized successfully");
   } catch (error) {
@@ -37,34 +28,9 @@ if (!admin.apps.length) {
 
 const db = admin.firestore();
 
-
-// Optional: Test connection
-async function testConnection() {
-  try {
-    const collections = await db.listCollections();
-    console.log(`✅ Firestore connected. Collections: ${collections.length}`);
-    
-  
-    console.log("✅ Firebase Auth connected");
-    
-    return true;
-  } catch (error) {
-    console.error("❌ Firebase connection test failed:", error.message);
-    return false;
-  }
-}
-
-// Run connection test on startup
-testConnection();
-
-
 module.exports = {
   admin,
   db,
-
   FieldValue: admin.firestore.FieldValue,
-  Timestamp: admin.firestore.Timestamp,
-  testConnection
+  Timestamp: admin.firestore.Timestamp
 };
-
-
