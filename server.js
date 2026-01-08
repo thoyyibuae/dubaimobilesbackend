@@ -19,6 +19,9 @@ const transactionRoutes = require('./routes/transactionRoutes');
 const normalUserRoutes = require('./routes/normal_user_routes');
 
 const subcategoriesRoutes = require('./routes/subcategoryRoutes');
+const otpRoutes = require('./routes/otpRoutes');
+
+
 
 
 const { initializeDatabases } = require('./config/database');
@@ -546,6 +549,7 @@ const startServer = async () => {
 
 
     // Routes
+    app.use("/api/otp", otpRoutes);
     app.use('/api/auth/admin', authRoutes);
     app.use('/api/branches', branchRoutes);
     app.use('/api/departments', departmentRoutes);
