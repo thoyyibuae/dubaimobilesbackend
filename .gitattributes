@@ -1,0 +1,4 @@
+*.json text eol=lf
+serviceAccountKey.json -text
+firebase-adminsdk-*.json -text
+firebase.json text eol=lf
