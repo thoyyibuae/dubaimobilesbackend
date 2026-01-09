@@ -171,7 +171,8 @@ exports. verifyOtp = async (req, res) => {
 
     const { verificationId, otp, companyName } = req.body;
 
-    // 1️⃣ Validate input
+    // 1️⃣ Validate inputs
+//new lines
     if (!verificationId || !otp || !companyName) {
       return res.status(400).json({
         success: false,
