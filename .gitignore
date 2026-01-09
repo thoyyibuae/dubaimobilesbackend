@@ -16,6 +16,7 @@ firebase-adminsdk-*.json
 # AWS config
 config/awsConfig.js
 
+
 # Logs
 logs/
 *.log

@@ -419,6 +419,7 @@ function generateOtp() {
 }
 
 exports.sendOtp = async (req, res) => {
+ 
   try {
     const { phoneNumber, name, companyName } = req.body;
 
@@ -461,8 +462,8 @@ exports.sendOtp = async (req, res) => {
     const verificationId = uuidv4();
     const otp = generateOtp();
 
-    const reqFast2Sms = unirest("POST", "https://www.fast2sms.com/dev/bulkV2");
-
+    console.log('API KEY:', FAST2SMS_API_KEY);
+     const reqFast2Sms = unirest("POST", "https://www.fast2sms.com/dev/bulkV2");
     reqFast2Sms.headers({
       authorization: FAST2SMS_API_KEY,
       "Content-Type": "application/json",
@@ -476,27 +477,29 @@ exports.sendOtp = async (req, res) => {
       numbers: phoneNumber,
     });
 
-    reqFast2Sms.end(async (response) => {
-      if (response.error) {
-        return res.status(500).json({
-          success: false,
-          message: "Failed to send OTP",
-          error: response.error,
-        });
-      }
+  reqFast2Sms.end(async (response) => {
+  try {
+    if (response.error) {
+      return res.status(500).json({
+        success: false,
+        message: "Failed to send OTP",
+      });
+    }
 
-      const result = response.body;
+    const result = response.body;
 
-      if (result.return === true) {
-        // ✅ Store user ID from PostgreSQL lookup
-        otpStore.set(verificationId, {
-          otp,
-          phoneNumber,
-          companyName,
-          userId: user.id, // Store the PostgreSQL user ID
-          timestamp: Date.now(),
-        });
+    if (result.return === true) {
 
+      otpStore.set(verificationId, {
+        otp,
+        phoneNumber,
+        companyName,
+        userId: user.id,
+        timestamp: Date.now(),
+      });
+
+      // 🔐 Firestore write (safe now)
+      try {
         await db
           .collection("clients_otp_usage")
           .doc(companyName)
@@ -507,24 +510,40 @@ exports.sendOtp = async (req, res) => {
             },
             { merge: true }
           );
-
-        return res.status(200).json({
-          success: true,
-          verificationId,
-          message: "OTP sent successfully",
-          userExists: true,
-          name: user.name,
-          role: user.role
-        });
-      } else {
-        return res.status(500).json({
-          success: false,
-          message: "Failed to send OTP",
-          error: result.message || "Unknown error from Fast2SMS",
-        });
+      } catch (firestoreError) {
+        console.error("Firestore error:", firestoreError);
+        // ❗ Do NOT crash app
       }
+
+      return res.status(200).json({
+        success: true,
+        verificationId,
+        message: "OTP sent successfully",
+        userExists: true,
+        name: user.name,
+        role: user.role,
+      });
+    }
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to send OTP",
     });
+
+  } catch (err) {
+    console.error("OTP callback error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+});
+
+    //Simulate successful OTP sending for testing
+
+
   } catch (error) {
+    console.log(error)
     console.error("Send OTP error:", error);
     return res.status(500).json({
       success: false,
@@ -533,11 +552,11 @@ exports.sendOtp = async (req, res) => {
     });
   }
 };
-
-exports.verifyOtp = async (req, res) => {
+exports. verifyOtp = async (req, res) => {
   try {
     const { verificationId, otp, companyName } = req.body;
 
+    // 1️⃣ Validate input
     if (!verificationId || !otp || !companyName) {
       return res.status(400).json({
         success: false,
@@ -545,6 +564,8 @@ exports.verifyOtp = async (req, res) => {
       });
     }
 
+    
+    // 2️⃣ Get OTP from memory
     const storedData = otpStore.get(verificationId);
 
     if (!storedData) {
@@ -554,7 +575,7 @@ exports.verifyOtp = async (req, res) => {
       });
     }
 
-    // Check OTP expiration (5 minutes)
+    // 3️⃣ Check OTP expiry (5 mins)
     if (Date.now() - storedData.timestamp > 5 * 60 * 1000) {
       otpStore.delete(verificationId);
       return res.status(400).json({
@@ -563,73 +584,66 @@ exports.verifyOtp = async (req, res) => {
       });
     }
 
-    if (storedData.otp === parseInt(otp, 10)) {
-      otpStore.delete(verificationId);
+    // 4️⃣ Validate OTP
+    if (storedData.otp !== parseInt(otp, 10)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid OTP",
+      });
+    }
 
-      // ✅ Get complete user details from PostgreSQL using stored user ID
-      const userQuery = `
-        SELECT 
-          id,
-          name,
-          email,
-          role,
-          personal_number,
-          official_number,
-          branch_id,
-          status,
-          user_image,
-          id_document,
-          id_proof_images,
-          salary,
-          date_of_birth,
-          join_date,
-          created_at,
-          updated_at
-        FROM users 
-        WHERE id = $1
-      `;
+    // OTP verified – delete it
+    otpStore.delete(verificationId);
 
-      const userResult = await pool.query(userQuery, [storedData.userId]);
+    // 5️⃣ Fetch user from PostgreSQL
+    const userQuery = `
+      SELECT 
+        id,
+        name,
+        email,
+        role,
+        personal_number,
+        official_number,
+        branch_id,
+        status,
+        user_image,
+        id_document,
+        id_proof_images,
+        salary,
+        date_of_birth,
+        join_date,
+        created_at,
+        updated_at
+      FROM users 
+      WHERE id = $1
+    `;
 
-      if (userResult.rows.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: "User details not found",
-        });
-      }
+    const userResult = await pool.query(userQuery, [storedData.userId]);
 
-      const user = userResult.rows[0];
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
 
-      // Format date fields
-      const formatUserDates = (user) => {
-        const formattedUser = { ...user };
-        
-        // Format date_of_birth (if exists)
-        if (user.date_of_birth) {
-          formattedUser.date_of_birth = new Date(user.date_of_birth).toISOString().split('T')[0];
-        }
-        
-        // Format join_date
-        if (user.join_date) {
-          formattedUser.join_date = new Date(user.join_date).toISOString();
-        }
-        
-        // Format created_at
-        if (user.created_at) {
-          formattedUser.created_at = new Date(user.created_at).toISOString();
-        }
-        
-        // Format updated_at
-        if (user.updated_at) {
-          formattedUser.updated_at = new Date(user.updated_at).toISOString();
-        }
-        
-        return formattedUser;
-      };
+    const user = userResult.rows[0];
 
-      const formattedUser = formatUserDates(user);
+    // 6️⃣ Format dates
+    const formattedUser = {
+      ...user,
+      date_of_birth: user.date_of_birth
+        ? new Date(user.date_of_birth).toISOString().split("T")[0]
+        : null,
+      join_date: user.join_date
+        ? new Date(user.join_date).toISOString()
+        : null,
+      created_at: new Date(user.created_at).toISOString(),
+      updated_at: new Date(user.updated_at).toISOString(),
+    };
 
-      // Optional: Log verification in Firebase
+    // 7️⃣ Firestore logging (NON-BLOCKING)
+    try {
       await db
         .collection("clients_otp_usage")
         .doc(companyName)
@@ -640,39 +654,36 @@ exports.verifyOtp = async (req, res) => {
           },
           { merge: true }
         );
-
-
-            const token = jwt.sign(
-              {
-                userId: user.id,
-                email: user.email,
-                role: user.role,
-                name: user.name,
-                branch_id: user.branch_id
-              },
-              process.env.JWT_SECRET,
-              { expiresIn: '24h' }
-            );
-      
-            
-
-      return res.status(200).json({
-        success: true,
-        message: "OTP verified successfully!",
-        token,
-        user: formattedUser,
-        session: {
-          userId: user.id,
-          phoneNumber: storedData.phoneNumber,
-          companyName: companyName,
-          verifiedAt: new Date().toISOString(),
-        },
-      });
+    } catch (firestoreError) {
+      console.error("Firestore OTP verify log failed:", firestoreError);
+      // ❗ Do not stop login
     }
 
-    return res.status(400).json({
-      success: false,
-      message: "Invalid OTP",
+    // 8️⃣ Create JWT
+    const token = jwt.sign(
+      {
+        userId: user.id,
+        email: user.email,
+        role: user.role,
+        name: user.name,
+        branch_id: user.branch_id,
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: "24h" }
+    );
+
+    // 9️⃣ Success response
+    return res.status(200).json({
+      success: true,
+      message: "OTP verified successfully",
+      token,
+      user: formattedUser,
+      session: {
+        userId: user.id,
+        phoneNumber: storedData.phoneNumber,
+        companyName,
+        verifiedAt: new Date().toISOString(),
+      },
     });
   } catch (error) {
     console.error("Verify OTP error:", error);
