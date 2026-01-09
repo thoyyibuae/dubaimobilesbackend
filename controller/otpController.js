@@ -556,6 +556,8 @@ exports.sendOtp = async (req, res) => {
 //verify
 exports. verifyOtp = async (req, res) => {
   try {
+    console.log("Verify OTP request body:", req.body);
+    
     const { verificationId, otp, companyName } = req.body;
 
     // 1️⃣ Validate input
