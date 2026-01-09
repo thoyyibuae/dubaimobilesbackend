@@ -1,23 +1,5 @@
 const admin = require('firebase-admin');
 
-// function loadServiceAccount() {
-  // Priority: base64 env var -> local file
-
-  
-
-
-  // try {
-  //   // keep local file for development but DO NOT commit it
-  //   // file name is ignored by .gitignore
-  //   return require('./serviceAccountKey.json');
-  // } catch (e) {
-  //   return null;
-  // }
-// }
-
-
-
-
 
 const serviceAccount = {
   "type": "service_account",

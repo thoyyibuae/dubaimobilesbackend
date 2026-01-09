@@ -552,6 +552,8 @@ exports.sendOtp = async (req, res) => {
     });
   }
 };
+
+//verify
 exports. verifyOtp = async (req, res) => {
   try {
     const { verificationId, otp, companyName } = req.body;
@@ -564,7 +566,7 @@ exports. verifyOtp = async (req, res) => {
       });
     }
 
-    
+
     // 2️⃣ Get OTP from memory
     const storedData = otpStore.get(verificationId);
 
