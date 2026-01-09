@@ -69,6 +69,7 @@ const pool = require('./config/database');
 const initializeDatabase = async () => {
   const client = await pool.connect();
 
+  
   try {
     console.log('🔄 Initializing database schema...');
 
