@@ -13,6 +13,7 @@ firebase.json
 serviceAccountKey.json
 firebase-adminsdk-*.json
 
+
 # AWS config
 config/awsConfig.js
 

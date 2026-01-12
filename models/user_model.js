@@ -511,18 +511,39 @@ class User {
 
   // Find user by ID
   static async findById(id) {
-    const query = `
-      SELECT 
-        u.id, u.name, u.email, u.role, u.branch_id, u.status,
-        u.personal_number, u.official_number, 
-        u.user_image, u.id_document, u.id_proof_images, u.salary, 
-        u.date_of_birth, u.join_date,
-        u.created_by, u.created_at, u.updated_at,
-        c.name as created_by_name, c.email as created_by_email, c.role as created_by_role
-      FROM users u
-      LEFT JOIN users c ON u.created_by = c.id
-      WHERE u.id = $1
-    `;
+
+
+    // const query = `
+    //   SELECT 
+    //     u.id, u.name, u.email, u.role, u.branch_id, u.status,
+    //     u.personal_number, u.official_number, 
+    //     u.user_image, u.id_document, u.id_proof_images, u.salary, 
+    //     u.date_of_birth, u.join_date,
+    //     u.created_by, u.created_at, u.updated_at,
+    //     c.name as created_by_name, c.email as created_by_email, c.role as created_by_role
+    //   FROM users u
+    //   LEFT JOIN users c ON u.created_by = c.id
+    //   WHERE u.id = $1
+    // `;
+
+
+  const query = `
+    SELECT 
+      u.id, u.name, u.email, u.role, u.branch_id, u.status,
+      u.personal_number, u.official_number, 
+      u.user_image, u.id_document, u.id_proof_images, u.salary, 
+      u.date_of_birth, u.join_date,
+      u.created_by, u.created_at, u.updated_at,
+      c.name as created_by_name, c.email as created_by_email, c.role as created_by_role,
+      b.name as branch_name  -- Added branch_name from branches table
+    FROM users u
+    LEFT JOIN users c ON u.created_by = c.id
+    LEFT JOIN branches b ON u.branch_id = b.id  -- Added JOIN with branches table
+    WHERE u.id = $1
+  `;
+
+
+  console.log("the user details get");
     
     const client = await pool.connect();
     try {
