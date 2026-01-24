@@ -879,3 +879,93 @@ exports.deleteStock = async (req, res) => {
     }
 };
 
+
+
+
+
+
+
+
+
+
+
+// Add to stock_controller.js
+exports.checkSingleQRCode = async (req, res) => {
+    try {
+        const { qrcode } = req.body;
+        
+        // Validate input
+        if (!qrcode || typeof qrcode !== 'string' || qrcode.trim().length === 0) {
+            return res.status(400).json({
+                status: false,
+                message: "QR code is required and must be a non-empty string",
+                example: { "qrcode": "qr_09" }
+            });
+        }
+        
+        // Clean the QR code
+        const cleanedQRCode = qrcode
+            .replace(/[\[\]"]/g, '') // Remove brackets and quotes
+            .trim();
+        
+        console.log(`Checking QR code: "${cleanedQRCode}"`);
+        
+        // Check QR code existence with all relations
+        const qrResult = await Stock.findQRCodeWithRelations(cleanedQRCode);
+        
+        // Prepare response data
+        const response = {
+            status: true,
+            qrExist: qrResult.qrExist,
+            message: qrResult.exists 
+                ? `QR code "${cleanedQRCode}" found in ${qrResult.total_stocks} stock(s)` 
+                : `QR code "${cleanedQRCode}" does not exist in any stock`,
+            data: {
+                qrcode: qrResult.qrcode,
+                exists: qrResult.exists,
+                found_in_stocks: qrResult.total_stocks,
+                checked_at: qrResult.found_at,
+                stocks: qrResult.stocks.map(stock => ({
+                    stock_id: stock.id,
+                    stock_name: stock.name,
+                    stock_sku: stock.sku,
+                    status: stock.status,
+                    quantity: stock.quantity,
+                    branch: stock.branch_name || 'N/A',
+                    brand: stock.brand_name || 'N/A',
+                    category: stock.category_name || 'N/A',
+                    supplier: stock.supplier_name || 'N/A',
+                    created_by: stock.creator_name || stock.created_by,
+                    created_at: stock.created_at,
+                    qrcodelist: stock.qrcodelist || []
+                }))
+            }
+        };
+        
+        // If QR code exists, add summary information
+        if (qrResult.exists) {
+            response.data.summary = {
+                total_quantity: qrResult.stocks.reduce((sum, stock) => sum + (stock.quantity || 0), 0),
+                active_stocks: qrResult.stocks.filter(s => s.status === 'active').length,
+                inactive_stocks: qrResult.stocks.filter(s => s.status !== 'active').length,
+                out_of_stock: qrResult.stocks.filter(s => (s.quantity || 0) <= 0).length,
+                low_stock: qrResult.stocks.filter(s => {
+                    const qty = s.quantity || 0;
+                    const threshold = s.low_stock_threshold || 0;
+                    return qty > 0 && qty <= threshold;
+                }).length
+            };
+        }
+        
+        return res.status(200).json(response);
+        
+    } catch (err) {
+        console.error('Check single QR code error:', err.message);
+        return res.status(500).json({
+            status: false,
+            message: "Failed to check QR code",
+            error: err.message,
+            stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+        });
+    }
+};

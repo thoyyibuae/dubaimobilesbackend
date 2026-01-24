@@ -540,143 +540,6 @@ async create(stock) {
 },
 
 
-//    async update(id, stock) {
-//     const query = `
-//         UPDATE stocks SET
-//             name=$1, 
-//             sku=$2, 
-//             description=$3,
-//             category_id=$4, 
-//             brand_id=$5, 
-//             branch_id=$6, 
-//             supplier_id=$7,
-//             cost_price=$8, 
-//             selling_price=$9, 
-//             dealer_price=$10, 
-//             shop_price=$11,
-//             quantity=$12, 
-//             low_stock_threshold=$13, 
-//             unit=$14, 
-//             status=$15,
-//             images=$16, 
-//             specifications=$17,
-//             updated_at=CURRENT_TIMESTAMP
-//         WHERE id=$18 
-//         RETURNING *;
-//     `;
-
-//     const values = [
-//         stock.name || '',
-//         stock.sku || '',
-//         stock.description || '',
-//         stock.category_id,
-//         stock.brand_id,
-//         stock.branch_id,
-//         stock.supplier_id,
-//         stock.cost_price || 0.0,
-//         stock.selling_price || 0.0,
-//         stock.dealer_price || 0.0,
-//         stock.shop_price || 0.0,
-//         stock.quantity || 0,
-//         stock.low_stock_threshold || 0,
-//         stock.unit || 'pcs',
-//         stock.status || 'active',
-//         stock.images || [],
-//         stock.specifications || {},
-//         id
-//     ];
-
-//     console.log('Update Query:', query);
-//     console.log('Update Values:', values);
-    
-//     try {
-//         const result = await pool.query(query, values);
-//         return result.rows[0];
-//     } catch (error) {
-//         console.error('Database update error:', error.message);
-//         console.error('Error details:', error);
-//         throw error;
-//     }
-// },
-
-
-// Add this method to get stock with basic details
-
-
-
-async update(id, stock) {
-    // 🎯 ADD qrcodelist to the UPDATE query
-    const query = `
-        UPDATE stocks SET
-            name=$1, 
-            sku=$2, 
-            description=$3,
-            category_id=$4, 
-            brand_id=$5, 
-            branch_id=$6, 
-            supplier_id=$7,
-            cost_price=$8, 
-            selling_price=$9, 
-            dealer_price=$10, 
-            shop_price=$11,
-            quantity=$12, 
-            low_stock_threshold=$13, 
-            unit=$14, 
-            status=$15,
-            images=$16, 
-            specifications=$17,
-            qrcodelist=$18,  // 🎯 ADDED
-            updated_at=CURRENT_TIMESTAMP
-        WHERE id=$19 
-        RETURNING *;
-    `;
-
-    // 🎯 FIX: Parse qrcodelist properly
-    let qrcodelist = stock.qrcodelist || [];
-    
-    if (typeof qrcodelist === 'string') {
-        // Remove any quotes and brackets
-        qrcodelist = qrcodelist.replace(/[\[\]"]/g, '');
-        // Split by comma and trim
-        qrcodelist = qrcodelist.split(',').map(item => item.trim()).filter(item => item);
-    }
-    
-    if (!Array.isArray(qrcodelist)) {
-        qrcodelist = [];
-    }
-
-    const values = [
-        stock.name || '',
-        stock.sku || '',
-        stock.description || '',
-        stock.category_id,
-        stock.brand_id,
-        stock.branch_id,
-        stock.supplier_id,
-        stock.cost_price || 0.0,
-        stock.selling_price || 0.0,
-        stock.dealer_price || 0.0,
-        stock.shop_price || 0.0,
-        stock.quantity || 0,
-        stock.low_stock_threshold || 0,
-        stock.unit || 'pcs',
-        stock.status || 'active',
-        stock.images || [],
-        stock.specifications || {},
-        qrcodelist,  // 🎯 ADDED: qrcodelist parameter
-        id
-    ];
-
-    console.log('Update Query values - qrcodelist:', qrcodelist);
-    
-    try {
-        const result = await pool.query(query, values);
-        return result.rows[0];
-    } catch (error) {
-        console.error('Database update error:', error.message);
-        throw error;
-    }
-},
 
 async getAll({ search, branchId, categoryId, brandId, supplierId, offset, limit, createdBy, isAdmin = false }) {
     try {
@@ -1426,5 +1289,55 @@ async findByIdWithBasicDetails(id) {
     async delete(id) {
         await pool.query(`DELETE FROM stocks WHERE id=$1`, [id]);
         return { message: "Stock deleted" };
+    },
+
+
+    
+
+
+// Add to stock_model.js
+async findQRCodeWithRelations(qrcode) {
+    try {
+        if (!qrcode || typeof qrcode !== 'string') {
+            throw new Error('Valid QR code string is required');
+        }
+        
+        const query = `
+            SELECT 
+                s.*,
+                c.name as category_name,
+                b.name as brand_name,
+                br.name as branch_name,
+                sup.name as supplier_name,
+                u.name as creator_name,
+                u.email as creator_email
+            FROM stocks s
+            LEFT JOIN categories c ON s.category_id = c.id
+            LEFT JOIN brands b ON s.brand_id = b.id
+            LEFT JOIN branches br ON s.branch_id = br.id
+            LEFT JOIN suppliers sup ON s.supplier_id = sup.id
+            LEFT JOIN users u ON s.created_by = u.id
+            WHERE $1 = ANY(s.qrcodelist)
+            AND s.qrcodelist IS NOT NULL
+            ORDER BY s.created_at DESC;
+        `;
+        
+        const result = await pool.query(query, [qrcode.trim()]);
+        
+
+        return {
+            exists: result.rows.length > 0,
+            qrExist:result.rows.length > 0 ? true:false,
+            qrcode: qrcode.trim(),
+            total_stocks: result.rows.length,
+            stocks: result.rows,
+            found_at: new Date().toISOString()
+        };
+    } catch (error) {
+        console.error('Error checking QR code with relations:', error);
+        throw error;
     }
+}
+
+
 };
