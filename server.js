@@ -473,12 +473,14 @@ const initializeDatabase = async () => {
       status VARCHAR(20) DEFAULT 'active',
       images TEXT[] DEFAULT '{}',
       specifications JSONB DEFAULT '{}'::jsonb,
+      qrcodelist TEXT[] DEFAULT '{}',
      created_by INTEGER,  
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
   `);
 
+  
 
 
 
