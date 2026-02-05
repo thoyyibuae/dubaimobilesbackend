@@ -571,9 +571,10 @@ const startServer = async () => {
     app.use('/api/normal-users', normalUserRoutes);
    app.use('/api/subcategories', subcategoriesRoutes);
 
+   
 
-    app.use('/refresh', authenticateRefreshToken, refreshAccessToken);
-     app.use('/logout', logout);
+    app.use('/api/refresh', authenticateRefreshToken, refreshAccessToken);
+     app.use('/api/logout', logout);
 
 
 //    router.post('/refresh', authenticateRefreshToken, refreshAccessToken);
