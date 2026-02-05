@@ -11,6 +11,11 @@ const {
   authorizeRoles 
 } = require('../middleware/authMiddleware');
 
+
+const { generateRefreshToken } = require('../middleware/authMiddleware'); // Add this import
+
+
+
 // Configure multer for file uploads (for form-data)
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -498,10 +503,27 @@ router.post('/login', async (req, res) => {
       { expiresIn: '24h' }
     );
 
+   // TEMPORARY: Generate refresh token only if secret exists
+    let refreshToken = null;
+    if (process.env.JWT_REFRESH_SECRET) {
+      refreshToken = generateRefreshToken({
+        id: user.id,
+        email: user.email,
+        role: user.role
+      });
+    } else {
+      console.warn('⚠️ JWT_REFRESH_SECRET not defined, skipping refresh token generation');
+      // Or generate a dummy token for testing
+      // refreshToken = "refresh_token_not_configured";
+    }
+
+
+
     res.json({
       success: true,
       message: 'Logged in successfully',
       token,
+      refreshToken:refreshToken,
       user: {
         id: user.id,
         name: user.name,
@@ -522,6 +544,18 @@ router.post('/login', async (req, res) => {
     });
 
   } catch (error) {
+
+    
+// More detailed error message
+    if (error.message.includes('secretOrPrivateKey')) {
+      return res.status(500).json({ 
+        success: false,
+        error: 'Server configuration error: JWT_REFRESH_SECRET is missing',
+        details: 'Please add JWT_REFRESH_SECRET to your .env file'
+      });
+    }
+
+
     console.error('Login error:', error);
     res.status(500).json({ 
       success: false,

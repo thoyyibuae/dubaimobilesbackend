@@ -31,6 +31,13 @@ const { createNormalUsersTable, testConnection } = require('./config/normal_user
    const { initializeSubCategoryDatabases } = require('./config/subcategory_database');
 
 
+ const { 
+      authenticateRefreshToken, 
+      refreshAccessToken,
+      logout 
+    } = require('./middleware/authMiddleware'); 
+
+
 
 
 const app = express();
@@ -565,8 +572,16 @@ const startServer = async () => {
    app.use('/api/subcategories', subcategoriesRoutes);
 
 
+    app.use('/refresh', authenticateRefreshToken, refreshAccessToken);
+     app.use('/logout', logout);
+
+
+//    router.post('/refresh', authenticateRefreshToken, refreshAccessToken);
+// router.post('/logout', logout);
+
     
    
+
 
 
     // Health check endpoint
