@@ -65,7 +65,9 @@ exports.createStock = async (req, res) => {
         console.log("Received body:", body);
         console.log("User ID (createdBy):", createdBy);
 
+
         const images = req.files?.map(file => `/uploads/stocks/${file.filename}`) || [];
+        
         const specifications = body.specifications ? JSON.parse(body.specifications) : {};
 
         // ==============================================

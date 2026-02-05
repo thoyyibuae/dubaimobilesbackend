@@ -68,7 +68,7 @@ const validateBranchData = (req, res, next) => {
 router.post(
   '/',
   authenticateToken,
-  authorizeRoles('admin', 'manager'),
+  authorizeRoles('admin', 'manager','superadmin'),
   validateBranchData,
   async (req, res) => {
     try {
@@ -1676,7 +1676,7 @@ router.get('/', authenticateToken, async (req, res) => {
 router.put(
   '/:id',
   authenticateToken,
-  authorizeRoles('admin', 'manager'),
+  authorizeRoles('admin', 'manager','superadmin'),
   validateBranchData,
   async (req, res) => {
     try {
@@ -1761,7 +1761,7 @@ console.log(req.body+"Updated to body ");
 router.delete(
   '/:id',
   authenticateToken,
-  authorizeRoles('admin'),
+  authorizeRoles('admin','superadmin'),
   async (req, res) => {
     const client = await pool.connect();
     

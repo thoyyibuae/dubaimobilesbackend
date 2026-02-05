@@ -38,8 +38,6 @@ router.get("/:id", stockController.getStockById);
 router.put("/:id", upload.array("images", 10), stockController.updateStock);
 router.delete("/:id", stockController.deleteStock);
 
-
-
 router.post('/check-qrcode', stockController.checkSingleQRCode);
 
 
