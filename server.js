@@ -21,7 +21,15 @@ const normalUserRoutes = require('./routes/normal_user_routes');
 const subcategoriesRoutes = require('./routes/subcategoryRoutes');
 const otpRoutes = require('./routes/otpRoutes');
 
+//  const attendanceRoutes = require('./routes/routes_sales/attendanceRoutes_sales');
 
+
+  const attendanceRoutes = require('./routes/attendanceRoutes_sales');
+
+  // const employeeRoutes = require('./routes/routes_sales/employee.routes_sales');
+
+  
+  const employeeRoutes = require('./routes/employee_routes_sales');
 
 
 const { initializeDatabases } = require('./config/database');
@@ -36,6 +44,11 @@ const { createNormalUsersTable, testConnection } = require('./config/normal_user
       refreshAccessToken,
       logout 
     } = require('./middleware/authMiddleware'); 
+
+
+
+
+
 
 
 
@@ -571,7 +584,12 @@ const startServer = async () => {
     app.use('/api/normal-users', normalUserRoutes);
    app.use('/api/subcategories', subcategoriesRoutes);
 
+   //ssales section
+app.use("/api", employeeRoutes);
+app.use("/api", attendanceRoutes);
+
    
+
 
     app.use('/api/refresh', authenticateRefreshToken, refreshAccessToken);
      app.use('/api/logout', logout);
